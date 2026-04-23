@@ -8,13 +8,8 @@ export default function Home() {
   const [resposta, setResposta] = useState("");
 
   const enviar = async () => {
-    if (!img || !gabarito) {
-      alert("Envie a imagem e o gabarito");
-      return;
-    }
-
     try {
-      setResposta("Corrigindo... ⏳");
+      setResposta("Processando... ⏳");
 
       const r = await fetch("/api/corrigir", {
         method: "POST",
@@ -26,7 +21,11 @@ export default function Home() {
 
       const data = await r.json();
 
-      setResposta(data.resultado || data.erro || "Sem resposta");
+      if (data.teste) {
+        setResposta(JSON.stringify(data.teste, null, 2));
+      } else {
+        setResposta(data.resultado || data.erro || "Sem resposta");
+      }
 
     } catch (e) {
       setResposta("Erro na conexão ❌");
@@ -35,10 +34,10 @@ export default function Home() {
 
   return (
     <div style={{ padding: 20 }}>
-      <h1>📸 CorrigeFácil</h1>
+      <h1>📸 CorrigeFácil IA</h1>
 
       <textarea
-        placeholder="Ex: 1-C"
+        placeholder="Gabarito (opcional) Ex: 1-C,2-D"
         value={gabarito}
         onChange={(e) => setGabarito(e.target.value)}
         style={{ width: "100%", height: 80 }}
