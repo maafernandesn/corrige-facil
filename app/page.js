@@ -4,12 +4,16 @@ import { useState } from "react";
 
 export default function Home() {
   const [img, setImg] = useState(null);
-  const [pergunta, setPergunta] = useState("");
   const [resposta, setResposta] = useState("");
 
   const enviar = async () => {
+    if (!img) {
+      alert("Envie uma imagem");
+      return;
+    }
+
     try {
-      setResposta("Enviando... ⏳");
+      setResposta("Lendo imagem... ⏳");
 
       const baseUrl = window.location.origin;
 
@@ -18,7 +22,7 @@ export default function Home() {
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ img, pergunta })
+        body: JSON.stringify({ img })
       });
 
       const data = await r.json();
@@ -31,21 +35,14 @@ export default function Home() {
       );
 
     } catch (err) {
-      console.error("ERRO:", err);
-      setResposta("Erro na conexão ❌ (imagem muito grande)");
+      console.error(err);
+      setResposta("Erro na conexão ❌");
     }
   };
 
   return (
     <div style={{ padding: 20 }}>
-      <h1>📸 CorrigeFácil IA</h1>
-
-      <textarea
-        placeholder="Ex: Corrija a prova"
-        value={pergunta}
-        onChange={(e) => setPergunta(e.target.value)}
-        style={{ width: "100%", height: 80 }}
-      />
+      <h1>📸 CorrigeFácil OCR</h1>
 
       <input
         type="file"
@@ -63,8 +60,8 @@ export default function Home() {
             imgEl.onload = () => {
               const canvas = document.createElement("canvas");
 
-              // 🔥 REDUÇÃO FORTE
-              const maxWidth = 400;
+              // 🔥 compressão forte (evita erro)
+              const maxWidth = 500;
               const scale = maxWidth / imgEl.width;
 
               canvas.width = maxWidth;
@@ -73,10 +70,8 @@ export default function Home() {
               const ctx = canvas.getContext("2d");
               ctx.drawImage(imgEl, 0, 0, canvas.width, canvas.height);
 
-              // 🔥 compressão máxima
-              const compressed = canvas.toDataURL("image/jpeg", 0.5);
+              const compressed = canvas.toDataURL("image/jpeg", 0.6);
 
-              console.log("Imagem reduzida");
               setImg(compressed);
             };
           };
@@ -85,9 +80,13 @@ export default function Home() {
         }}
       />
 
-      <button onClick={enviar}>Enviar</button>
+      <button onClick={enviar} style={{ marginTop: 10 }}>
+        Corrigir
+      </button>
 
-      <pre style={{ marginTop: 20 }}>{resposta}</pre>
+      <pre style={{ marginTop: 20, whiteSpace: "pre-wrap" }}>
+        {resposta}
+      </pre>
     </div>
   );
 }
