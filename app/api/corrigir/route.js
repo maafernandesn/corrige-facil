@@ -6,30 +6,48 @@ export async function POST(req) {
       return Response.json({ erro: "Imagem não enviada" });
     }
 
-    // OCR (sem cortar imagem)
+    // OCR
     const ocrResponse = await fetch("https://api.ocr.space/parse/image", {
       method: "POST",
       headers: {
         apikey: "helloworld",
         "Content-Type": "application/x-www-form-urlencoded"
       },
-      body: `base64Image=${encodeURIComponent(img)}&language=por&OCREngine=2&scale=true&detectOrientation=true`
+      body: `base64Image=${encodeURIComponent(img)}&language=por&OCREngine=2&scale=true`
     });
 
     const ocrData = await ocrResponse.json();
-
     const texto = ocrData?.ParsedResults?.[0]?.ParsedText;
 
     console.log("OCR TEXTO:", texto);
 
     if (!texto || texto.trim().length < 3) {
       return Response.json({
-        resultado: "⚠️ Não consegui ler bem a imagem.\n\nTente:\n- tirar foto mais perto\n- melhorar iluminação\n- evitar sombra\n\nOu envie uma imagem mais nítida."
+        erro: "Não consegui ler a imagem"
       });
     }
 
-    // pega respostas tipo "1 A"
-    const respostasAluno = texto.match(/\d+\s*[A-D]/gi) || [];
+    // 🔥 NORMALIZA TEXTO
+    const textoLimpo = texto
+      .replace(/[^A-Za-z0-9\n ]/g, " ") // remove símbolos
+      .replace(/\s+/g, " "); // remove espaços duplicados
+
+    console.log("TEXTO LIMPO:", textoLimpo);
+
+    // 🔥 PEGA RESPOSTAS (mais inteligente)
+    const respostasAluno = [];
+
+    const regex = /(\d{1,2})\s*([A-D])/gi;
+    let match;
+
+    while ((match = regex.exec(textoLimpo)) !== null) {
+      respostasAluno.push({
+        num: match[1],
+        resp: match[2].toUpperCase()
+      });
+    }
+
+    console.log("RESPOSTAS DETECTADAS:", respostasAluno);
 
     if (!gabarito) {
       return Response.json({
@@ -37,6 +55,7 @@ export async function POST(req) {
       });
     }
 
+    // 🔥 GABARITO
     const gabaritoMap = {};
     gabarito.split(",").forEach(item => {
       const [q, r] = item.split("-");
@@ -50,23 +69,23 @@ export async function POST(req) {
     let total = 0;
 
     respostasAluno.forEach(item => {
-      const match = item.match(/(\d+)\s*([A-D])/i);
-      if (!match) return;
-
-      const num = match[1];
-      const resp = match[2].toUpperCase();
-
       total++;
 
-      if (gabaritoMap[num] === resp) {
+      if (gabaritoMap[item.num] === item.resp) {
         acertos++;
-        resultado += `${num} - Correta ✅\n`;
+        resultado += `${item.num} - Correta ✅\n`;
       } else {
-        resultado += `${num} - Errada ❌ (${resp})\n`;
+        resultado += `${item.num} - Errada ❌ (${item.resp})\n`;
       }
     });
 
-    const nota = total > 0 ? ((acertos / total) * 10).toFixed(1) : 0;
+    if (total === 0) {
+      return Response.json({
+        resultado: `⚠️ Não consegui identificar as respostas.\n\nTexto:\n${texto}`
+      });
+    }
+
+    const nota = ((acertos / total) * 10).toFixed(1);
 
     resultado += `\n🎯 Nota: ${nota}`;
 
