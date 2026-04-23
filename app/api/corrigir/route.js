@@ -8,6 +8,12 @@ export async function POST(req) {
       });
     }
 
+    if (!process.env.GEMINI_API_KEY) {
+      return Response.json({
+        erro: "Chave Gemini não configurada"
+      });
+    }
+
     const base64 = img.split(",")[1];
 
     const response = await fetch(
@@ -39,10 +45,21 @@ export async function POST(req) {
 
     const data = await response.json();
 
+    console.log("RESPOSTA GEMINI:", JSON.stringify(data, null, 2));
+
+    // 🔥 tenta extrair resposta de forma segura
+    let texto = "Sem resposta da IA";
+
+    if (data.candidates && data.candidates.length > 0) {
+      const parts = data.candidates[0].content?.parts;
+
+      if (parts && parts.length > 0) {
+        texto = parts.map(p => p.text || "").join("\n");
+      }
+    }
+
     return Response.json({
-      resultado:
-        data?.candidates?.[0]?.content?.parts?.[0]?.text ||
-        "Sem resposta da IA"
+      resultado: texto
     });
 
   } catch (error) {
