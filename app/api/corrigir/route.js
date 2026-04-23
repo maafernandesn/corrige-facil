@@ -6,28 +6,25 @@ export async function POST(req) {
       return Response.json({ erro: "Imagem não enviada" });
     }
 
-    // 🧠 PROMPT DE EXTRAÇÃO (FORÇA JSON LIMPO)
+    // 🔥 PROMPT MAIS FORTE
     const promptExtracao = `
-Analise a imagem de uma prova escolar.
+Leia a prova da imagem.
 
-Identifique cada questão e retorne APENAS JSON válido.
+Identifique TODAS as questões.
 
-NÃO escreva explicações.
+Para cada questão:
+- número
+- tipo (multipla_escolha ou dissertativa)
+- resposta do aluno
 
-Formato obrigatório:
+RETORNE APENAS JSON:
 
 [
-  {
-    "numero": 1,
-    "tipo": "multipla_escolha",
-    "resposta": "A"
-  },
-  {
-    "numero": 2,
-    "tipo": "dissertativa",
-    "resposta": "texto do aluno"
-  }
+  { "numero": 1, "tipo": "multipla_escolha", "resposta": "A" }
 ]
+
+IMPORTANTE:
+- Nunca retorne lista vazia
 `;
 
     const extracao = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -54,16 +51,9 @@ Formato obrigatório:
 
     const dataExtracao = await extracao.json();
 
-    let conteudo = dataExtracao?.choices?.[0]?.message?.content;
+    let conteudo = dataExtracao?.choices?.[0]?.message?.content || "";
 
-    if (!conteudo) {
-      return Response.json({
-        erro: "IA não retornou conteúdo",
-        detalhe: dataExtracao
-      });
-    }
-
-    // 🔥 LIMPEZA DO JSON
+    // 🔥 LIMPEZA
     conteudo = conteudo
       .replace(/```json/g, "")
       .replace(/```/g, "")
@@ -73,18 +63,26 @@ Formato obrigatório:
 
     if (!match) {
       return Response.json({
-        erro: "Não consegui extrair JSON",
+        erro: "IA não retornou JSON válido",
         detalhe: conteudo
       });
     }
 
-    let questoes;
+    let questoes = [];
 
     try {
       questoes = JSON.parse(match[0]);
     } catch (e) {
       return Response.json({
         erro: "Erro ao interpretar JSON",
+        detalhe: conteudo
+      });
+    }
+
+    // 🔥 GARANTIA: se vier vazio, erro claro
+    if (!Array.isArray(questoes) || questoes.length === 0) {
+      return Response.json({
+        erro: "Nenhuma questão identificada",
         detalhe: conteudo
       });
     }
@@ -102,13 +100,12 @@ Formato obrigatório:
     let acertos = 0;
     let total = 0;
 
-    // 🔥 CORREÇÃO
     for (const q of questoes) {
-      const num = q.numero;
+      const num = String(q.numero);
       const tipo = q.tipo;
-      const resposta = q.resposta;
+      const resposta = (q.resposta || "").toUpperCase();
 
-      // 🟢 MULTIPLA ESCOLHA
+      // 🟢 MULTIPLA
       if (tipo === "multipla_escolha" && respostasCorretas[num]) {
         total++;
 
@@ -132,17 +129,14 @@ Formato obrigatório:
         total++;
 
         const promptCorrecao = `
-Corrija uma resposta de aluno do ensino fundamental.
+Corrija a resposta:
 
-Resposta:
 "${resposta}"
 
-Avalie:
-- nota de 0 a 1
-- comentário simples
+Dê nota de 0 a 1 e comentário.
 
 Formato:
-Nota: 0.8
+Nota: X
 Comentário: ...
 `;
 
@@ -169,12 +163,18 @@ Comentário: ...
 
         acertos += nota;
 
-        resultado += `Questão ${num} - 📝 Dissertativa (${nota})\n`;
-        resultado += `${texto}\n\n`;
+        resultado += `Questão ${num} - 📝 (${nota})\n${texto}\n\n`;
       }
     }
 
-    const notaFinal = total > 0 ? ((acertos / total) * 10).toFixed(1) : 0;
+    if (total === 0) {
+      return Response.json({
+        erro: "Nenhuma questão válida para correção",
+        detalhe: questoes
+      });
+    }
+
+    const notaFinal = ((acertos / total) * 10).toFixed(1);
 
     resultado += `\n📊 Resultado: ${acertos.toFixed(1)}/${total}`;
     resultado += `\n🎯 Nota final: ${notaFinal}`;
