@@ -2,8 +2,16 @@ export async function POST(req) {
   try {
     const { img, pergunta } = await req.json();
 
+    if (!img) {
+      return Response.json({
+        erro: "Imagem não enviada"
+      });
+    }
+
+    const base64 = img.split(",")[1];
+
     const response = await fetch(
-      "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=SUA_CHAVE",
+      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
       {
         method: "POST",
         headers: {
@@ -14,12 +22,12 @@ export async function POST(req) {
             {
               parts: [
                 {
-                  text: pergunta || "Corrija a prova e dê a nota"
+                  text: pergunta || "Corrija esta prova e dê a nota"
                 },
                 {
                   inline_data: {
                     mime_type: "image/jpeg",
-                    data: img.split(",")[1]
+                    data: base64
                   }
                 }
               ]
@@ -32,7 +40,9 @@ export async function POST(req) {
     const data = await response.json();
 
     return Response.json({
-      resultado: data.candidates?.[0]?.content?.parts?.[0]?.text
+      resultado:
+        data?.candidates?.[0]?.content?.parts?.[0]?.text ||
+        "Sem resposta da IA"
     });
 
   } catch (error) {
