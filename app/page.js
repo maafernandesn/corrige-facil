@@ -8,13 +8,8 @@ export default function Home() {
   const [resposta, setResposta] = useState("");
 
   const enviar = async () => {
-    if (!img) {
-      alert("Envie uma imagem");
-      return;
-    }
-
     try {
-      setResposta("Analisando... ⏳");
+      setResposta("Testando IA... ⏳");
 
       const baseUrl = window.location.origin;
 
@@ -43,13 +38,13 @@ export default function Home() {
 
   return (
     <div style={{ padding: 20 }}>
-      <h1>📸 CorrigeFácil IA (Grátis)</h1>
+      <h1>📸 CorrigeFácil IA</h1>
 
       <textarea
-        placeholder="Ex: Corrija a prova e dê a nota"
+        placeholder="Digite algo ou peça para testar a IA"
         value={pergunta}
         onChange={(e) => setPergunta(e.target.value)}
-        style={{ width: "100%", height: 80, marginBottom: 10 }}
+        style={{ width: "100%", height: 80 }}
       />
 
       <input
@@ -57,32 +52,11 @@ export default function Home() {
         accept="image/*"
         onChange={(e) => {
           const file = e.target.files[0];
+
           if (!file) return;
 
-          const imgEl = new Image();
           const reader = new FileReader();
-
-          reader.onload = (event) => {
-            imgEl.src = event.target.result;
-          };
-
-          imgEl.onload = () => {
-            const canvas = document.createElement("canvas");
-
-            const maxWidth = 600;
-            const scale = maxWidth / imgEl.width;
-
-            canvas.width = maxWidth;
-            canvas.height = imgEl.height * scale;
-
-            const ctx = canvas.getContext("2d");
-            ctx.drawImage(imgEl, 0, 0, canvas.width, canvas.height);
-
-            const compressed = canvas.toDataURL("image/jpeg", 0.6);
-
-            setImg(compressed);
-          };
-
+          reader.onloadend = () => setImg(reader.result);
           reader.readAsDataURL(file);
         }}
       />
