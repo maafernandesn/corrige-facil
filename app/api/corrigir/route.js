@@ -21,73 +21,52 @@ export async function POST(req) {
 
     console.log("OCR TEXTO:", texto);
 
-    if (!texto || texto.trim().length < 3) {
+    if (!texto) {
+      return Response.json({ erro: "Não consegui ler a imagem" });
+    }
+
+    const textoMaiusculo = texto.toUpperCase();
+
+    let respostaAluno = null;
+
+    // 🔥 padrões possíveis
+    const padroes = {
+      A: [/A\s*[X\/]/, /[X\/]\s*A/, /AX/, /XA/, /A\/|\/A/],
+      B: [/B\s*[X\/]/, /[X\/]\s*B/, /BX/, /XB/, /B\/|\/B/],
+      C: [/C\s*[X\/]/, /[X\/]\s*C/, /CX/, /XC/, /C\/|\/C/],
+      D: [/D\s*[X\/]/, /[X\/]\s*D/, /DX/, /XD/, /D\/|\/D/],
+    };
+
+    for (const letra in padroes) {
+      const regexList = padroes[letra];
+
+      if (regexList.some(r => r.test(textoMaiusculo))) {
+        respostaAluno = letra;
+        break;
+      }
+    }
+
+    if (!respostaAluno) {
       return Response.json({
-        erro: "Não consegui ler a imagem"
+        resultado: `⚠️ Não consegui identificar a alternativa marcada.\n\nTexto:\n${texto}`
       });
     }
-
-    // 🔥 NORMALIZA TEXTO
-    const textoLimpo = texto
-      .replace(/[^A-Za-z0-9\n ]/g, " ") // remove símbolos
-      .replace(/\s+/g, " "); // remove espaços duplicados
-
-    console.log("TEXTO LIMPO:", textoLimpo);
-
-    // 🔥 PEGA RESPOSTAS (mais inteligente)
-    const respostasAluno = [];
-
-    const regex = /(\d{1,2})\s*([A-D])/gi;
-    let match;
-
-    while ((match = regex.exec(textoLimpo)) !== null) {
-      respostasAluno.push({
-        num: match[1],
-        resp: match[2].toUpperCase()
-      });
-    }
-
-    console.log("RESPOSTAS DETECTADAS:", respostasAluno);
 
     if (!gabarito) {
       return Response.json({
-        resultado: `Texto identificado:\n\n${texto}`
+        resultado: `Resposta detectada: ${respostaAluno}`
       });
     }
 
-    // 🔥 GABARITO
-    const gabaritoMap = {};
-    gabarito.split(",").forEach(item => {
-      const [q, r] = item.split("-");
-      if (q && r) {
-        gabaritoMap[q.trim()] = r.trim().toUpperCase();
-      }
-    });
+    const [q, correta] = gabarito.split("-");
 
     let resultado = "📄 Correção\n\n";
-    let acertos = 0;
-    let total = 0;
 
-    respostasAluno.forEach(item => {
-      total++;
-
-      if (gabaritoMap[item.num] === item.resp) {
-        acertos++;
-        resultado += `${item.num} - Correta ✅\n`;
-      } else {
-        resultado += `${item.num} - Errada ❌ (${item.resp})\n`;
-      }
-    });
-
-    if (total === 0) {
-      return Response.json({
-        resultado: `⚠️ Não consegui identificar as respostas.\n\nTexto:\n${texto}`
-      });
+    if (respostaAluno === correta.trim().toUpperCase()) {
+      resultado += `Questão ${q} - Correta ✅\n🎯 Nota: 10`;
+    } else {
+      resultado += `Questão ${q} - Errada ❌ (${respostaAluno})\n🎯 Nota: 0`;
     }
-
-    const nota = ((acertos / total) * 10).toFixed(1);
-
-    resultado += `\n🎯 Nota: ${nota}`;
 
     return Response.json({ resultado });
 
