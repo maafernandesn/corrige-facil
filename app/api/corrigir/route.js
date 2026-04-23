@@ -6,7 +6,7 @@ export async function POST(req) {
       return Response.json({ erro: "Imagem não enviada" });
     }
 
-    // 🔍 OCR
+    // OCR
     const ocrResponse = await fetch("https://api.ocr.space/parse/image", {
       method: "POST",
       headers: {
@@ -27,29 +27,32 @@ export async function POST(req) {
 
     console.log("TEXTO OCR:", texto);
 
-    // 🧠 "IA" simples (lógica automática)
-    const linhas = texto.split("\n").filter(l => l.trim() !== "");
+    // 🔥 FILTRAR LINHAS REAIS
+    const linhas = texto.split("\n").filter(l =>
+      /^\d+\s*[A-D]$/i.test(l.trim())
+    );
 
     let resultado = "📄 Correção da prova\n\n";
     let nota = 0;
     let total = 0;
 
-    linhas.forEach((linha, index) => {
-      // exemplo simples: detecta respostas tipo A, B, C, D
-      const match = linha.match(/[A-D]/i);
+    // 🔥 LIMITAR A 20 QUESTÕES (evita lixo do OCR)
+    const limite = Math.min(linhas.length, 20);
 
-      if (match) {
-        total++;
+    for (let i = 0; i < limite; i++) {
+      const linha = linhas[i];
+      const resposta = linha.match(/[A-D]/i)[0].toUpperCase();
 
-        // regra fictícia: considera A como correta (exemplo)
-        if (match[0].toUpperCase() === "A") {
-          nota++;
-          resultado += `${index + 1} - Correta ✅\n`;
-        } else {
-          resultado += `${index + 1} - Errada ❌ (${match[0]})\n`;
-        }
+      total++;
+
+      // exemplo: A correta
+      if (resposta === "A") {
+        nota++;
+        resultado += `${i + 1} - Correta ✅\n`;
+      } else {
+        resultado += `${i + 1} - Errada ❌ (${resposta})\n`;
       }
-    });
+    }
 
     if (total === 0) {
       return Response.json({
@@ -66,8 +69,6 @@ export async function POST(req) {
     });
 
   } catch (error) {
-    console.error(error);
-
     return Response.json({
       erro: "Erro no processamento",
       detalhe: error.message
