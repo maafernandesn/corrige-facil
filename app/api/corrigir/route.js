@@ -9,7 +9,7 @@ export async function POST(req) {
     }
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.0-pro:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
       {
         method: "POST",
         headers: {
@@ -20,7 +20,7 @@ export async function POST(req) {
             {
               parts: [
                 {
-                  text: pergunta || "Responda OK"
+                  text: pergunta || "Responda apenas OK"
                 }
               ]
             }
@@ -30,6 +30,8 @@ export async function POST(req) {
     );
 
     const data = await response.json();
+
+    console.log("GEMINI:", data);
 
     return Response.json({
       resultado:
