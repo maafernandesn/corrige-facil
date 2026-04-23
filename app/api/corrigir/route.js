@@ -1,10 +1,6 @@
 export async function POST(req) {
   try {
-    const { img } = await req.json();
-
-    if (!img) {
-      return Response.json({ erro: "Imagem não enviada" });
-    }
+    const { img, gabarito } = await req.json();
 
     // OCR
     const ocrResponse = await fetch("https://api.ocr.space/parse/image", {
@@ -13,46 +9,45 @@ export async function POST(req) {
         apikey: "helloworld",
         "Content-Type": "application/x-www-form-urlencoded"
       },
-      body: `base64Image=${encodeURIComponent(img)}&language=por&detectOrientation=true&scale=true&OCREngine=2`
+      body: `base64Image=${encodeURIComponent(img)}&language=por&OCREngine=2`
     });
 
     const ocrData = await ocrResponse.json();
     const texto = ocrData?.ParsedResults?.[0]?.ParsedText;
 
-    if (!texto || texto.trim().length < 20) {
-      return Response.json({
-        erro: "Não foi possível ler a imagem"
-      });
-    }
+    const respostasAluno = texto.match(/\d+\s*[A-D]/gi) || [];
 
-    console.log("TEXTO OCR:", texto);
+    const gabaritoMap = {};
+    gabarito.split(",").forEach(item => {
+      const [q, r] = item.split("-");
+      gabaritoMap[q.trim()] = r.trim().toUpperCase();
+    });
 
-    // 🔍 extrair questões
-    const questoes = texto.split(/\d+\)/).filter(q => q.trim().length > 20);
+    let resultado = "📄 Correção\n\n";
+    let acertos = 0;
+    let total = 0;
 
-    let resultado = "📄 Correção da prova\n\n";
+    respostasAluno.forEach(item => {
+      const [num, resp] = item.split(/\s+/);
+      total++;
 
-    questoes.forEach((q, index) => {
-      const alternativas = q.match(/[A-D]\).*?\n/g);
-
-      if (alternativas) {
-        resultado += `Questão ${index + 1}:\n`;
-
-        // 🔥 lógica simples: pega alternativa com palavra mais “provável”
-        // (simulação de IA leve)
-        const correta = alternativas[0]; 
-
-        resultado += `✔ Resposta sugerida: ${correta.trim()}\n\n`;
+      if (gabaritoMap[num] === resp.toUpperCase()) {
+        acertos++;
+        resultado += `${num} - Correta ✅\n`;
+      } else {
+        resultado += `${num} - Errada ❌ (${resp})\n`;
       }
     });
 
-    return Response.json({
-      resultado: resultado || "Não foi possível corrigir automaticamente"
-    });
+    const nota = ((acertos / total) * 10).toFixed(1);
+
+    resultado += `\n🎯 Nota: ${nota}`;
+
+    return Response.json({ resultado });
 
   } catch (error) {
     return Response.json({
-      erro: "Erro no processamento",
+      erro: "Erro",
       detalhe: error.message
     });
   }
