@@ -9,33 +9,26 @@ export async function POST(req) {
     const base64 = img.split(",")[1];
 
     const prompt = gabarito
-      ? `
-Você é um corretor de provas.
+      ? `Analise a imagem de uma prova.
 
-Leia a imagem:
-- Identifique cada questão
-- Identifique a alternativa marcada
-- Compare com o gabarito: ${gabarito}
+Identifique cada questão e a alternativa marcada.
+
+Compare com o gabarito: ${gabarito}
 
 Responda assim:
 Questão 1 - Correta ou Errada
 Questão 2 - ...
-Nota final: X
-`
-      : `
-Você é um leitor de provas.
+Nota final: X`
+      : `Analise a imagem de uma prova.
 
-Leia a imagem:
-- Identifique cada questão
-- Identifique a alternativa marcada (A, B, C ou D)
+Identifique cada questão e qual alternativa foi marcada (A, B, C ou D).
 
 Responda assim:
-Questão 1 - Alternativa marcada: X
-Questão 2 - Alternativa marcada: X
-`;
+Questão 1 - Alternativa: X
+Questão 2 - Alternativa: X`;
 
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
       {
         method: "POST",
         headers: {
@@ -44,6 +37,7 @@ Questão 2 - Alternativa marcada: X
         body: JSON.stringify({
           contents: [
             {
+              role: "user",
               parts: [
                 { text: prompt },
                 {
@@ -61,14 +55,14 @@ Questão 2 - Alternativa marcada: X
 
     const data = await res.json();
 
-    console.log("RESPOSTA GEMINI:", JSON.stringify(data, null, 2));
+    console.log("GEMINI:", data);
 
     const resposta =
-      data?.candidates?.[0]?.content?.parts?.find(p => p.text)?.text;
+      data?.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!resposta) {
       return Response.json({
-        erro: "IA não retornou texto",
+        erro: "IA não retornou resposta",
         detalhe: JSON.stringify(data)
       });
     }
