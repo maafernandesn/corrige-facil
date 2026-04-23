@@ -6,19 +6,35 @@ export async function POST(req) {
       return Response.json({ erro: "Imagem não enviada" });
     }
 
-    // OCR (SEM cortar imagem)
+    // 🔍 OCR
     const ocrResponse = await fetch("https://api.ocr.space/parse/image", {
       method: "POST",
       headers: {
         apikey: "helloworld",
         "Content-Type": "application/x-www-form-urlencoded"
       },
-      body: `base64Image=${encodeURIComponent(img)}&language=por&OCREngine=2&scale=true&detectOrientation=true`
+      body: `base64Image=${encodeURIComponent(img)}&language=por&OCREngine=2&scale=true`
     });
 
-    const ocrData = await ocrResponse.json();
+    // 🔥 VERIFICA STATUS HTTP
+    if (!ocrResponse.ok) {
+      return Response.json({
+        erro: "Erro HTTP no OCR",
+        detalhe: ocrResponse.status
+      });
+    }
 
-    console.log("OCR:", ocrData);
+    let ocrData;
+
+    try {
+      ocrData = await ocrResponse.json();
+    } catch {
+      return Response.json({
+        erro: "OCR retornou resposta inválida"
+      });
+    }
+
+    console.log("OCR DATA:", ocrData);
 
     if (!ocrData || ocrData.IsErroredOnProcessing) {
       return Response.json({
@@ -27,7 +43,7 @@ export async function POST(req) {
       });
     }
 
-    const texto = ocrData.ParsedResults?.[0]?.ParsedText;
+    const texto = ocrData?.ParsedResults?.[0]?.ParsedText;
 
     if (!texto || texto.trim().length < 5) {
       return Response.json({
@@ -36,6 +52,7 @@ export async function POST(req) {
       });
     }
 
+    // 🔥 PROCESSAMENTO SEGURO
     const linhas = texto
       .split("\n")
       .map(l => l.trim())
@@ -44,18 +61,23 @@ export async function POST(req) {
     const letras = ["A", "B", "C", "D"];
     let alternativas = [];
 
-    // pegar alternativas
-    linhas.forEach(l => {
+    for (const l of linhas) {
       if (/^[A-D]\)/i.test(l) || l.includes("•")) {
         alternativas.push(l);
       }
-    });
+    }
 
-    console.log("ALTERNATIVAS:", alternativas);
+    if (alternativas.length === 0) {
+      return Response.json({
+        resultado: "Não encontrei alternativas.\n\nTexto:\n" + texto
+      });
+    }
 
     let respostaAluno = null;
 
-    alternativas.forEach((alt, i) => {
+    for (let i = 0; i < alternativas.length; i++) {
+      const alt = alternativas[i];
+
       if (
         alt.includes("•") ||
         alt.includes("X") ||
@@ -63,18 +85,19 @@ export async function POST(req) {
         alt.includes("*")
       ) {
         respostaAluno = letras[i];
+        break;
       }
-    });
+    }
 
     if (!respostaAluno) {
       return Response.json({
-        resultado: `⚠️ Não consegui identificar a resposta marcada.\n\nTexto:\n${texto}`
+        resultado: "Não consegui identificar a resposta.\n\nTexto:\n" + texto
       });
     }
 
     if (!gabarito) {
       return Response.json({
-        resultado: `Resposta detectada: ${respostaAluno}`
+        resultado: "Resposta detectada: " + respostaAluno
       });
     }
 
@@ -91,7 +114,7 @@ export async function POST(req) {
     return Response.json({ resultado });
 
   } catch (error) {
-    console.error("ERRO:", error);
+    console.error("ERRO REAL:", error);
 
     return Response.json({
       erro: "Erro no processamento",
