@@ -20,7 +20,6 @@ export async function POST(req) {
       apiKey: process.env.OPENAI_API_KEY,
     });
 
-    // 🧠 monta conteúdo com várias imagens
     const conteudo = [
       {
         type: "input_text",
@@ -48,7 +47,7 @@ Tarefas:
 - Identificar respostas
 - Apontar erros
 - Dar nota de 0 a 10
-- Explicar brevemente os erros
+- Explicar os erros de forma simples
 `
         },
         {
@@ -63,6 +62,8 @@ Tarefas:
     });
 
   } catch (error) {
+    console.error("ERRO IA:", error);
+
     return Response.json({
       erro: "Erro na IA",
       detalhe: error.message
