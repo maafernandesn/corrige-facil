@@ -6,58 +6,57 @@ export async function POST(req) {
       return Response.json({ erro: "Imagem não enviada" });
     }
 
-    // 🔍 OCR
     const ocrResponse = await fetch("https://api.ocr.space/parse/image", {
       method: "POST",
       headers: {
         apikey: "helloworld",
         "Content-Type": "application/x-www-form-urlencoded"
       },
-      body: `base64Image=${encodeURIComponent(img)}&language=por&OCREngine=2&scale=true`
+      body: `base64Image=${encodeURIComponent(img)}&language=por&OCREngine=2`
     });
 
     const ocrData = await ocrResponse.json();
 
-    if (!ocrData || ocrData.IsErroredOnProcessing) {
-      return Response.json({
-        erro: "Erro no OCR",
-        detalhe: JSON.stringify(ocrData)
-      });
-    }
-
     const texto = ocrData?.ParsedResults?.[0]?.ParsedText;
 
-    if (!texto || texto.trim().length < 5) {
+    if (!texto) {
       return Response.json({
         erro: "Não consegui ler a imagem"
       });
     }
 
-    const linhas = texto.split("\n");
+    const linhas = texto
+      .split("\n")
+      .map(l => l.trim())
+      .filter(Boolean);
+
+    // 🔥 pegar apenas linhas de alternativas
+    const alternativas = linhas.filter(l =>
+      l.match(/^[A-D]\)/i) ||
+      l.includes("*") ||
+      l.includes("•") ||
+      l.includes("X") ||
+      l.includes("/")
+    );
 
     const letras = ["A", "B", "C", "D"];
-    let alternativas = [];
-
-    // 🔥 pegar alternativas
-    linhas.forEach(l => {
-      if (/^[A-D]\)/i.test(l) || l.includes("•")) {
-        alternativas.push(l);
-      }
-    });
 
     let respostaAluno = null;
 
-    // 🔥 detectar marcação
-    alternativas.forEach((alt, i) => {
+    // 🔥 usar posição (ordem)
+    for (let i = 0; i < alternativas.length; i++) {
+      const alt = alternativas[i];
+
       if (
+        alt.includes("*") ||
         alt.includes("•") ||
         alt.includes("X") ||
-        alt.includes("/") ||
-        alt.includes("*")
+        alt.includes("/")
       ) {
         respostaAluno = letras[i];
+        break;
       }
-    });
+    }
 
     if (!respostaAluno) {
       return Response.json({
@@ -65,7 +64,6 @@ export async function POST(req) {
       });
     }
 
-    // 🔥 gabarito
     const [q, correta] = gabarito.split("-");
 
     let resultado = "📄 Correção\n\n";
