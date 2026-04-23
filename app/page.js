@@ -16,7 +16,9 @@ export default function Home() {
     try {
       setResposta("Analisando imagens... ⏳");
 
-      const r = await fetch("/api/corrigir", {
+      const baseUrl = window.location.origin;
+
+      const r = await fetch(`${baseUrl}/api/corrigir`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -26,9 +28,15 @@ export default function Home() {
 
       const data = await r.json();
 
-      setResposta(data.resultado || data.erro || "Sem resposta");
+      setResposta(
+        data.resultado ||
+        data.erro ||
+        data.detalhe ||
+        "Sem resposta"
+      );
 
     } catch (err) {
+      console.error("ERRO REAL:", err);
       setResposta("Erro na conexão ❌");
     }
   };
@@ -38,7 +46,7 @@ export default function Home() {
       <h1>📸 CorrigeFácil IA</h1>
 
       <textarea
-        placeholder="Ex: Corrija essas provas e dê a nota"
+        placeholder="Ex: Corrija as provas e dê a nota"
         value={pergunta}
         onChange={(e) => setPergunta(e.target.value)}
         style={{
@@ -57,10 +65,30 @@ export default function Home() {
           const files = Array.from(e.target.files);
 
           files.forEach(file => {
+            const img = new Image();
             const reader = new FileReader();
-            reader.onloadend = () => {
-              setImgs(prev => [...prev, reader.result]);
+
+            reader.onload = (event) => {
+              img.src = event.target.result;
             };
+
+            img.onload = () => {
+              const canvas = document.createElement("canvas");
+
+              const maxWidth = 800;
+              const scale = maxWidth / img.width;
+
+              canvas.width = maxWidth;
+              canvas.height = img.height * scale;
+
+              const ctx = canvas.getContext("2d");
+              ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+              const compressed = canvas.toDataURL("image/jpeg", 0.7);
+
+              setImgs(prev => [...prev, compressed]);
+            };
+
             reader.readAsDataURL(file);
           });
         }}
