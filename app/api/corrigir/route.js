@@ -2,7 +2,7 @@ export async function POST(req) {
   try {
     const { img, gabarito } = await req.json();
 
-    // 🔥 TESTE SEM IMAGEM (para validar API)
+    // 🔥 TESTE SEM IMAGEM
     if (!img) {
       const res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
@@ -29,7 +29,7 @@ export async function POST(req) {
       });
     }
 
-    // 🔥 COM IMAGEM (modo normal)
+    // 🔥 COM IMAGEM
     const base64 = img.split(",")[1];
 
     const prompt = gabarito
@@ -79,7 +79,7 @@ Questão 2 - Alternativa: X`;
 
     const data = await res.json();
 
-    console.log("GEMINI RESPONSE:", data);
+    console.log("GEMINI:", data);
 
     const resposta =
       data?.candidates?.[0]?.content?.parts?.[0]?.text;
