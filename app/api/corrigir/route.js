@@ -2,12 +2,11 @@ import OpenAI from "openai";
 
 export async function POST(req) {
   try {
-    const { img, gabarito } = await req.json();
+    const { img, pergunta } = await req.json();
 
-    // 🔑 validação básica
     if (!process.env.OPENAI_API_KEY) {
       return Response.json({
-        erro: "Chave da OpenAI não configurada no Vercel"
+        erro: "Chave da OpenAI não configurada"
       });
     }
 
@@ -15,15 +14,40 @@ export async function POST(req) {
       apiKey: process.env.OPENAI_API_KEY,
     });
 
-    // 🧠 teste simples primeiro (sem imagem)
     const response = await openai.responses.create({
       model: "gpt-4o-mini",
-      input: `Corrija com base no gabarito abaixo:
+      input: [
+        {
+          role: "system",
+          content: `
+Você é um professor do ensino fundamental.
 
-${gabarito}
+Funções:
+- Corrigir provas a partir de imagem
+- Dar nota de 0 a 10
+- Explicar erros
+- Responder perguntas sobre a prova
 
-Se não houver imagem válida, apenas responda:
-"IA conectada com sucesso ✅"`
+Se o usuário pedir correção:
+- Liste questões
+- Diga certo/errado
+- Dê nota final
+`
+        },
+        {
+          role: "user",
+          content: [
+            {
+              type: "input_text",
+              text: pergunta || "Corrija esta prova e dê a nota"
+            },
+            {
+              type: "input_image",
+              image_url: img
+            }
+          ]
+        }
+      ]
     });
 
     return Response.json({
@@ -31,8 +55,6 @@ Se não houver imagem válida, apenas responda:
     });
 
   } catch (error) {
-    console.error("ERRO:", error);
-
     return Response.json({
       erro: "Erro na IA",
       detalhe: error.message
