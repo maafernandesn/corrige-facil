@@ -5,7 +5,7 @@ export async function POST(req) {
     // 🔥 TESTE SEM IMAGEM
     if (!img) {
       const res = await fetch(
-        ` https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent? key=${process.env.GEMINI_API_KEY}`,
+        `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
         {
           method: "POST",
           headers: {
@@ -24,9 +24,7 @@ export async function POST(req) {
 
       const data = await res.json();
 
-      return Response.json({
-        teste: data
-      });
+      return Response.json({ teste: data });
     }
 
     // 🔥 COM IMAGEM
@@ -52,7 +50,7 @@ Questão 1 - Alternativa: X
 Questão 2 - Alternativa: X`;
 
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent  ?key=${process.env.GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
       {
         method: "POST",
         headers: {
