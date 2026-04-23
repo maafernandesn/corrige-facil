@@ -21,7 +21,6 @@ export default function Home() {
 
       const data = await r.json();
 
-      // 🔥 MOSTRA RESULTADO BONITO
       setResposta(data.resultado || data.erro || "Sem resposta");
 
     } catch (e) {
@@ -34,7 +33,7 @@ export default function Home() {
       <h1 style={{ textAlign: "center" }}>📸 CorrigeFácil IA</h1>
 
       <textarea
-        placeholder="Gabarito (opcional) Ex: 1-C,2-D,3-A"
+        placeholder="Gabarito (opcional) Ex: 1-A,2-C,3-D"
         value={gabarito}
         onChange={(e) => setGabarito(e.target.value)}
         style={{
@@ -61,7 +60,7 @@ export default function Home() {
             imgEl.onload = () => {
               const canvas = document.createElement("canvas");
 
-              const maxWidth = 800;
+              const maxWidth = 1000;
               const scale = maxWidth / imgEl.width;
 
               canvas.width = maxWidth;
@@ -70,7 +69,8 @@ export default function Home() {
               const ctx = canvas.getContext("2d");
               ctx.drawImage(imgEl, 0, 0, canvas.width, canvas.height);
 
-              const compressed = canvas.toDataURL("image/jpeg", 0.8);
+              // 🔥 MENOS COMPRESSÃO = MELHOR LEITURA
+              const compressed = canvas.toDataURL("image/jpeg", 1.0);
 
               setImg(compressed);
             };
