@@ -1,61 +1,44 @@
-import OpenAI from "openai";
-
 export async function POST(req) {
   try {
-    const body = await req.json();
+    const { img, pergunta } = await req.json();
 
-    console.log("BODY:", body);
-
-    const img = body.img;
-    const pergunta = body.pergunta || "Corrija a prova";
-
-    if (!process.env.OPENAI_API_KEY) {
-      return Response.json({
-        erro: "SEM CHAVE OPENAI"
-      });
-    }
-
-    if (!img) {
-      return Response.json({
-        erro: "SEM IMAGEM"
-      });
-    }
-
-    const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
-
-    const response = await openai.responses.create({
-      model: "gpt-4o-mini",
-      input: [
-        {
-          role: "user",
-          content: [
+    const response = await fetch(
+      "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=SUA_CHAVE",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          contents: [
             {
-              type: "input_text",
-              text: pergunta
-            },
-            {
-              type: "input_image",
-              image_url: img
+              parts: [
+                {
+                  text: pergunta || "Corrija a prova e dê a nota"
+                },
+                {
+                  inline_data: {
+                    mime_type: "image/jpeg",
+                    data: img.split(",")[1]
+                  }
+                }
+              ]
             }
           ]
-        }
-      ]
-    });
+        })
+      }
+    );
 
-    console.log("RESPOSTA IA:", response);
+    const data = await response.json();
 
     return Response.json({
-      resultado: response.output_text || "Sem resposta da IA"
+      resultado: data.candidates?.[0]?.content?.parts?.[0]?.text
     });
 
   } catch (error) {
-    console.error("ERRO REAL COMPLETO:", error);
-
     return Response.json({
-      erro: "Erro na IA",
-      detalhe: JSON.stringify(error, null, 2)
+      erro: "Erro com Gemini",
+      detalhe: error.message
     });
   }
 }
