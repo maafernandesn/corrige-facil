@@ -3,116 +3,98 @@ export async function POST(req) {
     const { img, gabarito } = await req.json();
 
     if (!img) {
-      return Response.json({
-        erro: "Imagem não enviada"
-      });
+      return Response.json({ erro: "Imagem não enviada" });
     }
 
-    const prompt = gabarito
-      ? `Você é um corretor de provas EXTREMAMENTE rigoroso.
+    // 🔥 IA só extrai respostas
+    const prompt = `
+Leia a imagem da prova.
 
-Analise a imagem com atenção total:
+Identifique cada questão e a alternativa marcada.
 
-REGRAS IMPORTANTES:
-- Leia cada questão separadamente
-- NÃO repita respostas automaticamente
-- Identifique VISUALMENTE a alternativa marcada (X, círculo, traço, etc.)
-- Compare com o gabarito: ${gabarito}
-- Se não tiver certeza, escreva: "Não identificado"
+Responda SOMENTE assim:
+1-A,2-B,3-C,4-D
 
-PROIBIDO:
-- Assumir padrão (ex: tudo C)
-- Inventar resposta sem evidência
+Não explique nada.
+`;
 
-Responda EXATAMENTE assim:
+    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://seu-app.vercel.app",
+        "X-Title": "CorrigeFacilIA"
+      },
+      body: JSON.stringify({
+        model: "openai/gpt-4o",
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: prompt },
+              {
+                type: "image_url",
+                image_url: { url: img }
+              }
+            ]
+          }
+        ]
+      })
+    });
 
-📄 Correção
+    const data = await res.json();
 
-Questão 1 - Correta ou Errada (marcada: X)
-Questão 2 - Correta ou Errada (marcada: X)
-Questão 3 - Correta ou Errada (marcada: X)
+    const texto = data?.choices?.[0]?.message?.content;
 
-🎯 Nota final: X`
-      : `Você é um leitor de provas MUITO preciso.
-
-REGRAS:
-- Analise cada questão separadamente
-- Identifique VISUALMENTE a alternativa marcada
-- NÃO repita respostas iguais automaticamente
-- Se não tiver certeza, escreva: "Não identificado"
-
-Responda assim:
-
-Questão 1 - Alternativa: X
-Questão 2 - Alternativa: X
-Questão 3 - Alternativa: X`;
-
-    async function chamarIA(modelo) {
-      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": "https://seu-app.vercel.app",
-          "X-Title": "CorrigeFacilIA"
-        },
-        body: JSON.stringify({
-          model: modelo,
-          messages: [
-            {
-              role: "user",
-              content: [
-                { type: "text", text: prompt },
-                {
-                  type: "image_url",
-                  image_url: {
-                    url: img
-                  }
-                }
-              ]
-            }
-          ]
-        })
-      });
-
-      return res.json();
-    }
-
-    // 🔥 Primeira tentativa (rápida)
-    let data = await chamarIA("openai/gpt-4o-mini");
-
-    let resposta = data?.choices?.[0]?.message?.content;
-
-    // 🔥 Fallback automático (se vier ruim)
-    if (
-      !resposta ||
-      resposta.includes("C\n") ||
-      resposta.match(/Alternativa: C/g)?.length >= 3
-    ) {
-      console.log("⚠️ Resposta suspeita, tentando modelo melhor...");
-
-      data = await chamarIA("openai/gpt-4o");
-      resposta = data?.choices?.[0]?.message?.content;
-    }
-
-    // 🔥 erro da API
-    if (data.error) {
-      return Response.json({
-        erro: "Erro da API",
-        detalhe: data.error.message || JSON.stringify(data.error)
-      });
-    }
-
-    if (!resposta) {
+    if (!texto) {
       return Response.json({
         erro: "IA não respondeu",
         detalhe: JSON.stringify(data)
       });
     }
 
-    return Response.json({
-      resultado: resposta
+    // 🔥 transforma resposta IA em objeto
+    const respostasAluno = {};
+    texto.split(",").forEach(par => {
+      const [q, r] = par.trim().split("-");
+      if (q && r) respostasAluno[q] = r.toUpperCase();
     });
+
+    // 🔥 transforma gabarito
+    const respostasCorretas = {};
+    gabarito.split(",").forEach(par => {
+      const [q, r] = par.trim().split("-");
+      if (q && r) respostasCorretas[q] = r.toUpperCase();
+    });
+
+    // 🔥 CORREÇÃO REAL (100% precisa)
+    let resultado = "📄 Correção\n\n";
+    let acertos = 0;
+    let total = Object.keys(respostasCorretas).length;
+
+    Object.keys(respostasCorretas).forEach(q => {
+      const aluno = respostasAluno[q];
+      const correta = respostasCorretas[q];
+
+      if (!aluno) {
+        resultado += `Questão ${q} - Não identificada ⚠️\n`;
+        return;
+      }
+
+      if (aluno === correta) {
+        resultado += `Questão ${q} - Correta ✅ (${aluno})\n`;
+        acertos++;
+      } else {
+        resultado += `Questão ${q} - Errada ❌ (${aluno})\n`;
+      }
+    });
+
+    const nota = ((acertos / total) * 10).toFixed(1);
+
+    resultado += `\n🎯 Nota final: ${nota}`;
+
+    return Response.json({ resultado });
 
   } catch (error) {
     return Response.json({
