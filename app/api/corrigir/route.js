@@ -9,71 +9,99 @@ export async function POST(req) {
     }
 
     const prompt = gabarito
-      ? `Você é um corretor de provas.
+      ? `Você é um corretor de provas EXTREMAMENTE rigoroso.
 
-Analise a imagem:
-- Identifique cada questão numerada
-- Identifique a alternativa marcada (A, B, C ou D)
+Analise a imagem com atenção total:
+
+REGRAS IMPORTANTES:
+- Leia cada questão separadamente
+- NÃO repita respostas automaticamente
+- Identifique VISUALMENTE a alternativa marcada (X, círculo, traço, etc.)
 - Compare com o gabarito: ${gabarito}
+- Se não tiver certeza, escreva: "Não identificado"
+
+PROIBIDO:
+- Assumir padrão (ex: tudo C)
+- Inventar resposta sem evidência
 
 Responda EXATAMENTE assim:
 
 📄 Correção
 
-Questão 1 - Correta ou Errada
-Questão 2 - Correta ou Errada
-Questão 3 - Correta ou Errada
+Questão 1 - Correta ou Errada (marcada: X)
+Questão 2 - Correta ou Errada (marcada: X)
+Questão 3 - Correta ou Errada (marcada: X)
 
 🎯 Nota final: X`
-      : `Você é um leitor de provas.
+      : `Você é um leitor de provas MUITO preciso.
 
-Analise a imagem:
-- Identifique cada questão numerada
-- Identifique a alternativa marcada (A, B, C ou D)
+REGRAS:
+- Analise cada questão separadamente
+- Identifique VISUALMENTE a alternativa marcada
+- NÃO repita respostas iguais automaticamente
+- Se não tiver certeza, escreva: "Não identificado"
 
 Responda assim:
 
 Questão 1 - Alternativa: X
-Questão 2 - Alternativa: X`;
+Questão 2 - Alternativa: X
+Questão 3 - Alternativa: X`;
 
-    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://seu-app.vercel.app",
-        "X-Title": "CorrigeFacilIA"
-      },
-      body: JSON.stringify({
-        model: "openai/gpt-4o-mini",
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: prompt },
-              {
-                type: "image_url",
-                image_url: {
-                  url: img
+    async function chamarIA(modelo) {
+      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": "https://seu-app.vercel.app",
+          "X-Title": "CorrigeFacilIA"
+        },
+        body: JSON.stringify({
+          model: modelo,
+          messages: [
+            {
+              role: "user",
+              content: [
+                { type: "text", text: prompt },
+                {
+                  type: "image_url",
+                  image_url: {
+                    url: img
+                  }
                 }
-              }
-            ]
-          }
-        ]
-      })
-    });
+              ]
+            }
+          ]
+        })
+      });
 
-    const data = await res.json();
+      return res.json();
+    }
 
-    // 🔥 tratamento de erro real da API
+    // 🔥 Primeira tentativa (rápida)
+    let data = await chamarIA("openai/gpt-4o-mini");
+
+    let resposta = data?.choices?.[0]?.message?.content;
+
+    // 🔥 Fallback automático (se vier ruim)
+    if (
+      !resposta ||
+      resposta.includes("C\n") ||
+      resposta.match(/Alternativa: C/g)?.length >= 3
+    ) {
+      console.log("⚠️ Resposta suspeita, tentando modelo melhor...");
+
+      data = await chamarIA("openai/gpt-4o");
+      resposta = data?.choices?.[0]?.message?.content;
+    }
+
+    // 🔥 erro da API
     if (data.error) {
       return Response.json({
         erro: "Erro da API",
         detalhe: data.error.message || JSON.stringify(data.error)
       });
     }
-
-    const resposta = data?.choices?.[0]?.message?.content;
 
     if (!resposta) {
       return Response.json({
