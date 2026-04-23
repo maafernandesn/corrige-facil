@@ -25,26 +25,25 @@ export async function POST(req) {
       return Response.json({ erro: "Não consegui ler a imagem" });
     }
 
-    const textoMaiusculo = texto.toUpperCase();
+    const linhas = texto.split("\n");
+
+    // 🔥 pegar apenas alternativas
+    const alternativas = linhas.filter(l =>
+      l.match(/^[A-D]\)/i) || l.includes("•")
+    );
 
     let respostaAluno = null;
 
-    // 🔥 padrões possíveis
-    const padroes = {
-      A: [/A\s*[X\/]/, /[X\/]\s*A/, /AX/, /XA/, /A\/|\/A/],
-      B: [/B\s*[X\/]/, /[X\/]\s*B/, /BX/, /XB/, /B\/|\/B/],
-      C: [/C\s*[X\/]/, /[X\/]\s*C/, /CX/, /XC/, /C\/|\/C/],
-      D: [/D\s*[X\/]/, /[X\/]\s*D/, /DX/, /XD/, /D\/|\/D/],
-    };
+    alternativas.forEach((linha, index) => {
+      const l = linha.trim();
 
-    for (const letra in padroes) {
-      const regexList = padroes[letra];
-
-      if (regexList.some(r => r.test(textoMaiusculo))) {
-        respostaAluno = letra;
-        break;
+      // 🔥 se tem marcação
+      if (l.startsWith("•") || l.includes("•") || l.includes("X") || l.includes("/")) {
+        // posição define alternativa
+        const letras = ["A", "B", "C", "D"];
+        respostaAluno = letras[index];
       }
-    }
+    });
 
     if (!respostaAluno) {
       return Response.json({
