@@ -2,33 +2,7 @@ export async function POST(req) {
   try {
     const { img, gabarito } = await req.json();
 
-    // 🔥 TESTE SEM IMAGEM
-    if (!img) {
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            contents: [
-              {
-                role: "user",
-                parts: [{ text: "Responda apenas OK" }]
-              }
-            ]
-          })
-        }
-      );
-
-      const data = await res.json();
-
-      return Response.json({ teste: data });
-    }
-
-    // 🔥 COM IMAGEM
-    const base64 = img.split(",")[1];
+    const base64 = img ? img.split(",")[1] : null;
 
     const prompt = gabarito
       ? `Analise a imagem de uma prova.
@@ -50,7 +24,7 @@ Questão 1 - Alternativa: X
 Questão 2 - Alternativa: X`;
 
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-001:generateContent?key=${process.env.GEMINI_API_KEY}`,
       {
         method: "POST",
         headers: {
@@ -62,12 +36,16 @@ Questão 2 - Alternativa: X`;
               role: "user",
               parts: [
                 { text: prompt },
-                {
-                  inlineData: {
-                    mimeType: "image/jpeg",
-                    data: base64
-                  }
-                }
+                ...(base64
+                  ? [
+                      {
+                        inlineData: {
+                          mimeType: "image/jpeg",
+                          data: base64
+                        }
+                      }
+                    ]
+                  : [])
               ]
             }
           ]
