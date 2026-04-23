@@ -21,11 +21,8 @@ export default function Home() {
 
       const data = await r.json();
 
-      if (data.teste) {
-        setResposta(JSON.stringify(data.teste, null, 2));
-      } else {
-        setResposta(data.resultado || data.erro || "Sem resposta");
-      }
+      // 🔥 MOSTRA TUDO (ERRO OU SUCESSO)
+      setResposta(JSON.stringify(data, null, 2));
 
     } catch (e) {
       setResposta("Erro na conexão ❌");
