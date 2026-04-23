@@ -17,67 +17,106 @@ export async function POST(req) {
     });
 
     const ocrData = await ocrResponse.json();
-    const texto = ocrData?.ParsedResults?.[0]?.ParsedText;
 
-    console.log("OCR TEXTO:", texto);
-
-    if (!texto) {
-      return Response.json({ erro: "Não consegui ler a imagem" });
-    }
-
-    const linhas = texto.split("\n").map(l => l.trim()).filter(Boolean);
-
-    // 🔥 pegar apenas linhas de alternativas (A, B, C, D)
-    const alternativas = linhas.filter(l =>
-      /^[A-D]\)/i.test(l) || l.includes("•")
-    );
-
-    console.log("ALTERNATIVAS:", alternativas);
-
-    const letras = ["A", "B", "C", "D"];
-    let respostaAluno = null;
-
-    // 🔥 detectar qual linha está marcada
-    for (let i = 0; i < alternativas.length; i++) {
-      const linha = alternativas[i];
-
-      if (
-        linha.includes("•") ||
-        linha.includes("X") ||
-        linha.includes("/") ||
-        linha.includes("*")
-      ) {
-        respostaAluno = letras[i] || null;
-        break;
-      }
-    }
-
-    if (!respostaAluno) {
+    if (!ocrData || ocrData.IsErroredOnProcessing) {
       return Response.json({
-        resultado: `⚠️ Não consegui identificar a alternativa marcada.\n\nTexto:\n${texto}`
+        erro: "Erro no OCR",
+        detalhe: JSON.stringify(ocrData)
       });
     }
+
+    const texto = ocrData.ParsedResults?.[0]?.ParsedText;
+
+    if (!texto) {
+      return Response.json({
+        erro: "OCR não retornou texto"
+      });
+    }
+
+    const linhas = texto
+      .split("\n")
+      .map(l => l.trim())
+      .filter(Boolean);
+
+    console.log("LINHAS:", linhas);
+
+    const letras = ["A", "B", "C", "D"];
+    let respostasDetectadas = [];
+
+    let alternativasTemp = [];
+
+    linhas.forEach(linha => {
+      // pega alternativas
+      if (/^[A-D]\)/i.test(linha) || linha.includes("•")) {
+        alternativasTemp.push(linha);
+      }
+
+      // quando tem 4 alternativas → é uma questão
+      if (alternativasTemp.length === 4) {
+        let resposta = null;
+
+        alternativasTemp.forEach((alt, index) => {
+          if (
+            alt.includes("•") ||
+            alt.includes("X") ||
+            alt.includes("/") ||
+            alt.includes("*")
+          ) {
+            resposta = letras[index];
+          }
+        });
+
+        respostasDetectadas.push(resposta);
+        alternativasTemp = [];
+      }
+    });
+
+    console.log("RESPOSTAS:", respostasDetectadas);
 
     if (!gabarito) {
       return Response.json({
-        resultado: `Resposta detectada: ${respostaAluno}`
+        resultado: "Respostas detectadas: " + respostasDetectadas.join(", ")
       });
     }
 
-    const [q, correta] = gabarito.split("-");
+    // GABARITO
+    const gabaritoMap = {};
+    gabarito.split(",").forEach(item => {
+      const [q, r] = item.split("-");
+      if (q && r) {
+        gabaritoMap[q.trim()] = r.trim().toUpperCase();
+      }
+    });
 
     let resultado = "📄 Correção\n\n";
+    let acertos = 0;
+    let total = respostasDetectadas.length;
 
-    if (respostaAluno === correta.trim().toUpperCase()) {
-      resultado += `Questão ${q} - Correta ✅\n🎯 Nota: 10`;
-    } else {
-      resultado += `Questão ${q} - Errada ❌ (${respostaAluno})\n🎯 Nota: 0`;
-    }
+    respostasDetectadas.forEach((resp, index) => {
+      const num = (index + 1).toString();
+      const correta = gabaritoMap[num];
+
+      if (!resp) {
+        resultado += `${num} - Não identificado ⚠️\n`;
+        return;
+      }
+
+      if (resp === correta) {
+        acertos++;
+        resultado += `${num} - Correta ✅\n`;
+      } else {
+        resultado += `${num} - Errada ❌ (${resp})\n`;
+      }
+    });
+
+    const nota = total > 0 ? ((acertos / total) * 10).toFixed(1) : 0;
+
+    resultado += `\n🎯 Nota final: ${nota}`;
 
     return Response.json({ resultado });
 
   } catch (error) {
-    console.error("ERRO REAL:", error);
+    console.error("ERRO:", error);
 
     return Response.json({
       erro: "Erro no processamento",
