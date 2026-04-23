@@ -6,18 +6,15 @@ export async function POST(req) {
       return Response.json({ erro: "Imagem não enviada" });
     }
 
-    // 🧠 ETAPA 1 — EXTRAIR QUESTÕES
+    // 🧠 PROMPT DE EXTRAÇÃO (FORÇA JSON LIMPO)
     const promptExtracao = `
 Analise a imagem de uma prova escolar.
 
-Para cada questão:
-- Identifique o número
-- Identifique o tipo:
-  - multipla_escolha
-  - dissertativa
-- Identifique a resposta do aluno
+Identifique cada questão e retorne APENAS JSON válido.
 
-Responda em JSON:
+NÃO escreva explicações.
+
+Formato obrigatório:
 
 [
   {
@@ -57,16 +54,38 @@ Responda em JSON:
 
     const dataExtracao = await extracao.json();
 
+    let conteudo = dataExtracao?.choices?.[0]?.message?.content;
+
+    if (!conteudo) {
+      return Response.json({
+        erro: "IA não retornou conteúdo",
+        detalhe: dataExtracao
+      });
+    }
+
+    // 🔥 LIMPEZA DO JSON
+    conteudo = conteudo
+      .replace(/```json/g, "")
+      .replace(/```/g, "")
+      .trim();
+
+    const match = conteudo.match(/\[.*\]/s);
+
+    if (!match) {
+      return Response.json({
+        erro: "Não consegui extrair JSON",
+        detalhe: conteudo
+      });
+    }
+
     let questoes;
 
     try {
-      questoes = JSON.parse(
-        dataExtracao.choices[0].message.content
-      );
-    } catch {
+      questoes = JSON.parse(match[0]);
+    } catch (e) {
       return Response.json({
-        erro: "Erro ao interpretar prova",
-        detalhe: dataExtracao
+        erro: "Erro ao interpretar JSON",
+        detalhe: conteudo
       });
     }
 
@@ -83,7 +102,7 @@ Responda em JSON:
     let acertos = 0;
     let total = 0;
 
-    // 🔥 ETAPA 2 — CORREÇÃO
+    // 🔥 CORREÇÃO
     for (const q of questoes) {
       const num = q.numero;
       const tipo = q.tipo;
@@ -94,6 +113,11 @@ Responda em JSON:
         total++;
 
         const correta = respostasCorretas[num];
+
+        if (!resposta || resposta === "?") {
+          resultado += `Questão ${num} - ⚠️ Não identificada\n`;
+          continue;
+        }
 
         if (resposta === correta) {
           resultado += `Questão ${num} - ✅ Correta (${resposta})\n`;
@@ -108,12 +132,12 @@ Responda em JSON:
         total++;
 
         const promptCorrecao = `
-Corrija a resposta de um aluno do ensino fundamental.
+Corrija uma resposta de aluno do ensino fundamental.
 
-Resposta do aluno:
+Resposta:
 "${resposta}"
 
-Dê:
+Avalie:
 - nota de 0 a 1
 - comentário simples
 
@@ -131,10 +155,7 @@ Comentário: ...
           body: JSON.stringify({
             model: "openai/gpt-4o-mini",
             messages: [
-              {
-                role: "user",
-                content: promptCorrecao
-              }
+              { role: "user", content: promptCorrecao }
             ]
           })
         });
@@ -143,8 +164,8 @@ Comentário: ...
 
         const texto = dataCorr?.choices?.[0]?.message?.content || "";
 
-        const match = texto.match(/Nota:\s*(\d+(\.\d+)?)/);
-        const nota = match ? parseFloat(match[1]) : 0;
+        const matchNota = texto.match(/Nota:\s*(\d+(\.\d+)?)/);
+        const nota = matchNota ? parseFloat(matchNota[1]) : 0;
 
         acertos += nota;
 
