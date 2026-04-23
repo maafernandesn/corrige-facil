@@ -6,22 +6,20 @@ export async function POST(req) {
       return Response.json({ erro: "Imagem não enviada" });
     }
 
-    // 🔥 IA só lê respostas (não corrige)
+    // 🔥 IA só lê respostas
     const prompt = `
-Leia a imagem de uma prova objetiva com muita atenção.
+Leia a imagem de uma prova objetiva.
 
-INSTRUÇÕES:
-- Cada questão possui alternativas A, B, C, D
-- O aluno marca a resposta com X, traço ou círculo SOBRE a letra
-- Você deve identificar VISUALMENTE a alternativa marcada
-- NÃO assumir padrão (ex: tudo C)
-- Analise cada questão separadamente
-- NÃO inventar resposta
+REGRAS:
+- Cada questão tem alternativas A, B, C, D
+- O aluno marca com X, risco ou círculo
+- Identifique VISUALMENTE a alternativa marcada
+- NÃO inventar padrão
 
-Responda SOMENTE neste formato:
+Responda SOMENTE assim:
 1-A,2-B,3-C,4-D
 
-Se não tiver certeza, use:
+Se não tiver certeza:
 1-?,2-B,3-?,4-D
 `;
 
@@ -55,7 +53,7 @@ Se não tiver certeza, use:
     if (data.error) {
       return Response.json({
         erro: "Erro da API",
-        detalhe: data.error.message || JSON.stringify(data.error)
+        detalhe: data.error.message
       });
     }
 
@@ -68,14 +66,14 @@ Se não tiver certeza, use:
       });
     }
 
-    // 🔥 Parse respostas da IA
+    // 🔥 respostas do aluno
     const respostasAluno = {};
     texto.split(",").forEach(par => {
       const [q, r] = par.trim().split("-");
       if (q && r) respostasAluno[q] = r.toUpperCase();
     });
 
-    // 🔥 Parse gabarito
+    // 🔥 gabarito
     const respostasCorretas = {};
     if (gabarito) {
       gabarito.split(",").forEach(par => {
@@ -84,13 +82,11 @@ Se não tiver certeza, use:
       });
     }
 
-    // 🔥 CORREÇÃO
     let resultado = "📄 Correção\n\n";
     let acertos = 0;
     let total = Object.keys(respostasCorretas).length;
 
     if (!gabarito) {
-      // 🔹 Apenas leitura
       Object.keys(respostasAluno).forEach(q => {
         resultado += `Questão ${q} - Alternativa: ${respostasAluno[q]}\n`;
       });
@@ -98,26 +94,26 @@ Se não tiver certeza, use:
       return Response.json({ resultado });
     }
 
-    // 🔹 Correção com gabarito
     Object.keys(respostasCorretas).forEach(q => {
       const aluno = respostasAluno[q];
       const correta = respostasCorretas[q];
 
       if (!aluno || aluno === "?") {
-        resultado += `Questão ${q} - Não identificada ⚠️\n`;
+        resultado += `Questão ${q} - ⚠️ Não identificada\n`;
         return;
       }
 
       if (aluno === correta) {
-        resultado += `Questão ${q} - Correta ✅ (${aluno})\n`;
+        resultado += `Questão ${q} - ✅ Correta (${aluno})\n`;
         acertos++;
       } else {
-        resultado += `Questão ${q} - Errada ❌ (${aluno})\n`;
+        resultado += `Questão ${q} - ❌ Errada (${aluno}) | Correta: ${correta}\n`;
       }
     });
 
     const nota = total > 0 ? ((acertos / total) * 10).toFixed(1) : 0;
 
+    resultado += `\n📊 Acertos: ${acertos}/${total}`;
     resultado += `\n🎯 Nota final: ${nota}`;
 
     return Response.json({ resultado });
