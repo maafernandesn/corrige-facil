@@ -105,4 +105,3 @@ export async function POST(req) {
       detalhe: error.message
     });
   }
-}
