@@ -6,30 +6,38 @@ export async function POST(req) {
       return Response.json({ erro: "Imagem não enviada" });
     }
 
-    // 🔑 OCR API KEY (grátis)
+    // 🔑 OCR grátis
     const OCR_API_KEY = "helloworld";
 
-    // 🔄 enviar imagem para OCR
+    // 🔍 OCR com melhorias
     const ocrResponse = await fetch("https://api.ocr.space/parse/image", {
       method: "POST",
       headers: {
         apikey: OCR_API_KEY,
         "Content-Type": "application/x-www-form-urlencoded"
       },
-      body: `base64Image=${encodeURIComponent(img)}&language=por`
+      body: `base64Image=${encodeURIComponent(img)}&language=por&isOverlayRequired=false&detectOrientation=true&scale=true&OCREngine=2`
     });
 
     const ocrData = await ocrResponse.json();
 
     const texto = ocrData?.ParsedResults?.[0]?.ParsedText;
 
-    if (!texto) {
+    console.log("TEXTO OCR:", texto);
+
+    if (!texto || texto.trim().length < 10) {
       return Response.json({
-        erro: "Não foi possível ler o texto da imagem"
+        erro: "Não foi possível ler o texto da imagem. Tente tirar uma foto mais clara."
       });
     }
 
-    // 🤖 IA (Gemini texto)
+    if (!process.env.GEMINI_API_KEY) {
+      return Response.json({
+        erro: "Chave Gemini não configurada"
+      });
+    }
+
+    // 🤖 IA (apenas texto)
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${process.env.GEMINI_API_KEY}`,
       {
@@ -43,13 +51,17 @@ export async function POST(req) {
               parts: [
                 {
                   text: `
-Corrija essa prova:
+Você é um professor.
+
+Corrija a prova abaixo:
 
 ${texto}
 
-- Diga o que está certo/errado
+Faça:
+- Liste as questões
+- Diga o que está certo e errado
 - Dê nota de 0 a 10
-- Explique os erros
+- Explique erros
 `
                 }
               ]
@@ -68,6 +80,8 @@ ${texto}
     });
 
   } catch (error) {
+    console.error(error);
+
     return Response.json({
       erro: "Erro no processamento",
       detalhe: error.message
