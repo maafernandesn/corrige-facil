@@ -8,9 +8,34 @@ export async function POST(req) {
 
     const base64 = img.split(",")[1];
 
-    const response = await fetch(
-      "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=" +
-        process.env.GEMINI_API_KEY,
+    const prompt = gabarito
+      ? `
+Você é um corretor de provas.
+
+Leia a imagem:
+- Identifique cada questão
+- Identifique a alternativa marcada
+- Compare com o gabarito: ${gabarito}
+
+Responda assim:
+Questão 1 - Correta ou Errada
+Questão 2 - ...
+Nota final: X
+`
+      : `
+Você é um leitor de provas.
+
+Leia a imagem:
+- Identifique cada questão
+- Identifique a alternativa marcada (A, B, C ou D)
+
+Responda assim:
+Questão 1 - Alternativa marcada: X
+Questão 2 - Alternativa marcada: X
+`;
+
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
       {
         method: "POST",
         headers: {
@@ -20,23 +45,7 @@ export async function POST(req) {
           contents: [
             {
               parts: [
-                {
-                  text: `
-Você é um corretor de provas.
-
-Analise a imagem enviada:
-- Identifique cada questão
-- Identifique qual alternativa foi marcada
-- Compare com o gabarito: ${gabarito}
-
-Responda no formato:
-
-Questão 1 - Correta ou Errada
-Questão 2 - ...
-...
-Nota final: X
-`
-                },
+                { text: prompt },
                 {
                   inlineData: {
                     mimeType: "image/jpeg",
@@ -50,13 +59,13 @@ Nota final: X
       }
     );
 
-    const data = await response.json();
+    const data = await res.json();
 
-    const texto =
+    const resposta =
       data?.candidates?.[0]?.content?.parts?.[0]?.text ||
       "Sem resposta da IA";
 
-    return Response.json({ resultado: texto });
+    return Response.json({ resultado: resposta });
 
   } catch (error) {
     return Response.json({
