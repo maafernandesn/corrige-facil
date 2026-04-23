@@ -35,7 +35,7 @@ Questão 2 - Alternativa marcada: X
 `;
 
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key=${process.env.GEMINI_API_KEY}`,
       {
         method: "POST",
         headers: {
@@ -61,9 +61,17 @@ Questão 2 - Alternativa marcada: X
 
     const data = await res.json();
 
+    console.log("RESPOSTA GEMINI:", JSON.stringify(data, null, 2));
+
     const resposta =
-      data?.candidates?.[0]?.content?.parts?.[0]?.text ||
-      "Sem resposta da IA";
+      data?.candidates?.[0]?.content?.parts?.find(p => p.text)?.text;
+
+    if (!resposta) {
+      return Response.json({
+        erro: "IA não retornou texto",
+        detalhe: JSON.stringify(data)
+      });
+    }
 
     return Response.json({ resultado: resposta });
 
