@@ -6,20 +6,28 @@ export async function POST(req) {
       return Response.json({ erro: "Imagem não enviada" });
     }
 
+    // 🔍 OCR
     const ocrResponse = await fetch("https://api.ocr.space/parse/image", {
       method: "POST",
       headers: {
         apikey: "helloworld",
         "Content-Type": "application/x-www-form-urlencoded"
       },
-      body: `base64Image=${encodeURIComponent(img)}&language=por&OCREngine=2`
+      body: `base64Image=${encodeURIComponent(img)}&language=por&OCREngine=2&scale=true`
     });
 
     const ocrData = await ocrResponse.json();
 
+    if (!ocrData || ocrData.IsErroredOnProcessing) {
+      return Response.json({
+        erro: "Erro no OCR",
+        detalhe: JSON.stringify(ocrData)
+      });
+    }
+
     const texto = ocrData?.ParsedResults?.[0]?.ParsedText;
 
-    if (!texto) {
+    if (!texto || texto.trim().length < 5) {
       return Response.json({
         erro: "Não consegui ler a imagem"
       });
@@ -30,6 +38,7 @@ export async function POST(req) {
     const letras = ["A", "B", "C", "D"];
     let alternativas = [];
 
+    // 🔥 pegar alternativas
     linhas.forEach(l => {
       if (/^[A-D]\)/i.test(l) || l.includes("•")) {
         alternativas.push(l);
@@ -38,6 +47,7 @@ export async function POST(req) {
 
     let respostaAluno = null;
 
+    // 🔥 detectar marcação
     alternativas.forEach((alt, i) => {
       if (
         alt.includes("•") ||
@@ -51,10 +61,11 @@ export async function POST(req) {
 
     if (!respostaAluno) {
       return Response.json({
-        resultado: "Não consegui identificar a resposta.\n\n" + texto
+        resultado: "⚠️ Não consegui identificar a resposta.\n\n" + texto
       });
     }
 
+    // 🔥 gabarito
     const [q, correta] = gabarito.split("-");
 
     let resultado = "📄 Correção\n\n";
