@@ -1,6 +1,6 @@
 export async function POST(req) {
   try {
-    const { pergunta, img } = await req.json();
+    const { pergunta } = await req.json();
 
     if (!process.env.GEMINI_API_KEY) {
       return Response.json({
@@ -8,25 +8,8 @@ export async function POST(req) {
       });
     }
 
-    let parts = [];
-
-    parts.push({
-      text: pergunta || "Responda apenas: OK"
-    });
-
-    if (img) {
-      const base64 = img.split(",")[1];
-
-      parts.push({
-        inline_data: {
-          mime_type: "image/jpeg",
-          data: base64
-        }
-      });
-    }
-
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.0-pro:generateContent?key=${process.env.GEMINI_API_KEY}`,
       {
         method: "POST",
         headers: {
@@ -35,7 +18,11 @@ export async function POST(req) {
         body: JSON.stringify({
           contents: [
             {
-              parts
+              parts: [
+                {
+                  text: pergunta || "Responda OK"
+                }
+              ]
             }
           ]
         })
@@ -43,8 +30,6 @@ export async function POST(req) {
     );
 
     const data = await response.json();
-
-    console.log("GEMINI:", data);
 
     return Response.json({
       resultado:
