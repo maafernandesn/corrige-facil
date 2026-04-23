@@ -19,7 +19,7 @@ export async function POST(req) {
     const ocrData = await ocrResponse.json();
     const texto = ocrData?.ParsedResults?.[0]?.ParsedText;
 
-    if (!texto || texto.trim().length < 10) {
+    if (!texto || texto.trim().length < 5) {
       return Response.json({
         erro: "Não foi possível ler a imagem"
       });
@@ -27,35 +27,47 @@ export async function POST(req) {
 
     console.log("TEXTO OCR:", texto);
 
-    // 🤖 IA HuggingFace
-    const hfResponse = await fetch(
-      "https://api-inference.huggingface.co/models/google/flan-t5-large",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          inputs: `
-Corrija esta prova:
+    // 🧠 "IA" simples (lógica automática)
+    const linhas = texto.split("\n").filter(l => l.trim() !== "");
 
-${texto}
+    let resultado = "📄 Correção da prova\n\n";
+    let nota = 0;
+    let total = 0;
 
-- diga o que está certo e errado
-- dê nota de 0 a 10
-- explique erros
-`
-        })
+    linhas.forEach((linha, index) => {
+      // exemplo simples: detecta respostas tipo A, B, C, D
+      const match = linha.match(/[A-D]/i);
+
+      if (match) {
+        total++;
+
+        // regra fictícia: considera A como correta (exemplo)
+        if (match[0].toUpperCase() === "A") {
+          nota++;
+          resultado += `${index + 1} - Correta ✅\n`;
+        } else {
+          resultado += `${index + 1} - Errada ❌ (${match[0]})\n`;
+        }
       }
-    );
+    });
 
-    const hfData = await hfResponse.json();
+    if (total === 0) {
+      return Response.json({
+        resultado: `Texto identificado:\n\n${texto}`
+      });
+    }
+
+    const notaFinal = ((nota / total) * 10).toFixed(1);
+
+    resultado += `\n🎯 Nota final: ${notaFinal}`;
 
     return Response.json({
-      resultado: hfData?.[0]?.generated_text || "Sem resposta da IA"
+      resultado
     });
 
   } catch (error) {
+    console.error(error);
+
     return Response.json({
       erro: "Erro no processamento",
       detalhe: error.message
