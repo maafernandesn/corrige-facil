@@ -43,13 +43,13 @@ export default function Home() {
 
   return (
     <div style={{ padding: 20 }}>
-      <h1>📸 CorrigeFácil IA</h1>
+      <h1>📸 CorrigeFácil IA (Grátis)</h1>
 
       <textarea
         placeholder="Ex: Corrija a prova e dê a nota"
         value={pergunta}
         onChange={(e) => setPergunta(e.target.value)}
-        style={{ width: "100%", height: 80 }}
+        style={{ width: "100%", height: 80, marginBottom: 10 }}
       />
 
       <input
@@ -57,7 +57,6 @@ export default function Home() {
         accept="image/*"
         onChange={(e) => {
           const file = e.target.files[0];
-
           if (!file) return;
 
           const imgEl = new Image();
@@ -70,7 +69,7 @@ export default function Home() {
           imgEl.onload = () => {
             const canvas = document.createElement("canvas");
 
-            const maxWidth = 600; // 🔥 mais leve
+            const maxWidth = 600;
             const scale = maxWidth / imgEl.width;
 
             canvas.width = maxWidth;
@@ -88,7 +87,9 @@ export default function Home() {
         }}
       />
 
-      <button onClick={enviar}>Enviar</button>
+      <button onClick={enviar} style={{ marginTop: 10 }}>
+        Enviar
+      </button>
 
       <pre style={{ marginTop: 20 }}>{resposta}</pre>
     </div>
