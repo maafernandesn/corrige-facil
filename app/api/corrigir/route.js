@@ -1,8 +1,29 @@
 export async function POST(req) {
   try {
+    const { pergunta, img } = await req.json();
+
     if (!process.env.GEMINI_API_KEY) {
       return Response.json({
         erro: "Chave Gemini não configurada"
+      });
+    }
+
+    let parts = [];
+
+    // 👉 sempre envia texto
+    parts.push({
+      text: pergunta || "Responda: IA funcionando"
+    });
+
+    // 👉 só envia imagem se existir
+    if (img) {
+      const base64 = img.split(",")[1];
+
+      parts.push({
+        inline_data: {
+          mime_type: "image/jpeg",
+          data: base64
+        }
       });
     }
 
@@ -16,11 +37,7 @@ export async function POST(req) {
         body: JSON.stringify({
           contents: [
             {
-              parts: [
-                {
-                  text: "Responda apenas: IA funcionando perfeitamente"
-                }
-              ]
+              parts
             }
           ]
         })
@@ -29,10 +46,12 @@ export async function POST(req) {
 
     const data = await response.json();
 
+    console.log("GEMINI:", data);
+
     return Response.json({
       resultado:
         data?.candidates?.[0]?.content?.parts?.[0]?.text ||
-        "Sem resposta da IA"
+        JSON.stringify(data)
     });
 
   } catch (error) {
