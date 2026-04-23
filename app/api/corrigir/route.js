@@ -2,7 +2,7 @@ import OpenAI from "openai";
 
 export async function POST(req) {
   try {
-    const { img, pergunta } = await req.json();
+    const { imgs, pergunta } = await req.json();
 
     if (!process.env.OPENAI_API_KEY) {
       return Response.json({
@@ -10,8 +10,29 @@ export async function POST(req) {
       });
     }
 
+    if (!imgs || imgs.length === 0) {
+      return Response.json({
+        erro: "Nenhuma imagem enviada"
+      });
+    }
+
     const openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
+    });
+
+    // 🧠 monta conteúdo com várias imagens
+    const conteudo = [
+      {
+        type: "input_text",
+        text: pergunta || "Corrija as provas e dê a nota"
+      }
+    ];
+
+    imgs.forEach(img => {
+      conteudo.push({
+        type: "input_image",
+        image_url: img
+      });
     });
 
     const response = await openai.responses.create({
@@ -22,30 +43,17 @@ export async function POST(req) {
           content: `
 Você é um professor do ensino fundamental.
 
-Funções:
-- Corrigir provas a partir de imagem
+Tarefas:
+- Corrigir provas a partir de imagens
+- Identificar respostas
+- Apontar erros
 - Dar nota de 0 a 10
-- Explicar erros
-- Responder perguntas sobre a prova
-
-Se o usuário pedir correção:
-- Liste questões
-- Diga certo/errado
-- Dê nota final
+- Explicar brevemente os erros
 `
         },
         {
           role: "user",
-          content: [
-            {
-              type: "input_text",
-              text: pergunta || "Corrija esta prova e dê a nota"
-            },
-            {
-              type: "input_image",
-              image_url: img
-            }
-          ]
+          content: conteudo
         }
       ]
     });
