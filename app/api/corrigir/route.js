@@ -6,82 +6,56 @@ export async function POST(req) {
       return Response.json({ erro: "Imagem não enviada" });
     }
 
-    const OCR_API_KEY = "helloworld";
-
     // 🔍 OCR
     const ocrResponse = await fetch("https://api.ocr.space/parse/image", {
       method: "POST",
       headers: {
-        apikey: OCR_API_KEY,
+        apikey: "helloworld",
         "Content-Type": "application/x-www-form-urlencoded"
       },
       body: `base64Image=${encodeURIComponent(img)}&language=por&detectOrientation=true&scale=true&OCREngine=2`
     });
 
     const ocrData = await ocrResponse.json();
-
     const texto = ocrData?.ParsedResults?.[0]?.ParsedText;
-
-    console.log("TEXTO OCR:", texto);
 
     if (!texto || texto.trim().length < 10) {
       return Response.json({
-        erro: "Não foi possível ler o texto da imagem"
+        erro: "Não foi possível ler a imagem"
       });
     }
 
-    if (!process.env.GEMINI_API_KEY) {
-      return Response.json({
-        erro: "Chave Gemini não configurada"
-      });
-    }
+    console.log("TEXTO OCR:", texto);
 
-    // 🤖 IA (modelo correto)
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+    // 🤖 IA HuggingFace
+    const hfResponse = await fetch(
+      "https://api-inference.huggingface.co/models/google/flan-t5-large",
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: `
-Você é um professor.
-
-Corrija a prova abaixo:
+          inputs: `
+Corrija esta prova:
 
 ${texto}
 
-- Liste as questões
-- Diga o que está certo e errado
-- Dê nota de 0 a 10
-- Explique erros
+- diga o que está certo e errado
+- dê nota de 0 a 10
+- explique erros
 `
-                }
-              ]
-            }
-          ]
         })
       }
     );
 
-    const data = await response.json();
-
-    console.log("GEMINI:", data);
+    const hfData = await hfResponse.json();
 
     return Response.json({
-      resultado:
-        data?.candidates?.[0]?.content?.parts?.[0]?.text ||
-        JSON.stringify(data)
+      resultado: hfData?.[0]?.generated_text || "Sem resposta da IA"
     });
 
   } catch (error) {
-    console.error(error);
-
     return Response.json({
       erro: "Erro no processamento",
       detalhe: error.message
