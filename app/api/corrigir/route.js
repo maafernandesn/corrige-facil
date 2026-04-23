@@ -25,25 +25,32 @@ export async function POST(req) {
       return Response.json({ erro: "Não consegui ler a imagem" });
     }
 
-    const linhas = texto.split("\n");
+    const linhas = texto.split("\n").map(l => l.trim()).filter(Boolean);
 
-    // 🔥 pegar apenas alternativas
+    // 🔥 pegar apenas linhas de alternativas (A, B, C, D)
     const alternativas = linhas.filter(l =>
-      l.match(/^[A-D]\)/i) || l.includes("•")
+      /^[A-D]\)/i.test(l) || l.includes("•")
     );
 
+    console.log("ALTERNATIVAS:", alternativas);
+
+    const letras = ["A", "B", "C", "D"];
     let respostaAluno = null;
 
-    alternativas.forEach((linha, index) => {
-      const l = linha.trim();
+    // 🔥 detectar qual linha está marcada
+    for (let i = 0; i < alternativas.length; i++) {
+      const linha = alternativas[i];
 
-      // 🔥 se tem marcação
-      if (l.startsWith("•") || l.includes("•") || l.includes("X") || l.includes("/")) {
-        // posição define alternativa
-        const letras = ["A", "B", "C", "D"];
-        respostaAluno = letras[index];
+      if (
+        linha.includes("•") ||
+        linha.includes("X") ||
+        linha.includes("/") ||
+        linha.includes("*")
+      ) {
+        respostaAluno = letras[i] || null;
+        break;
       }
-    });
+    }
 
     if (!respostaAluno) {
       return Response.json({
@@ -70,6 +77,8 @@ export async function POST(req) {
     return Response.json({ resultado });
 
   } catch (error) {
+    console.error("ERRO REAL:", error);
+
     return Response.json({
       erro: "Erro no processamento",
       detalhe: error.message
