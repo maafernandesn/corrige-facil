@@ -2,17 +2,17 @@ import OpenAI from "openai";
 
 export async function POST(req) {
   try {
-    const { imgs, pergunta } = await req.json();
+    const { img, pergunta } = await req.json();
 
     if (!process.env.OPENAI_API_KEY) {
       return Response.json({
-        erro: "Chave da OpenAI não configurada"
+        erro: "Chave OpenAI não configurada"
       });
     }
 
-    if (!imgs || imgs.length === 0) {
+    if (!img) {
       return Response.json({
-        erro: "Nenhuma imagem enviada"
+        erro: "Imagem não enviada"
       });
     }
 
@@ -20,39 +20,21 @@ export async function POST(req) {
       apiKey: process.env.OPENAI_API_KEY,
     });
 
-    const conteudo = [
-      {
-        type: "input_text",
-        text: pergunta || "Corrija as provas e dê a nota"
-      }
-    ];
-
-    imgs.forEach(img => {
-      conteudo.push({
-        type: "input_image",
-        image_url: img
-      });
-    });
-
     const response = await openai.responses.create({
       model: "gpt-4o-mini",
       input: [
         {
-          role: "system",
-          content: `
-Você é um professor do ensino fundamental.
-
-Tarefas:
-- Corrigir provas a partir de imagens
-- Identificar respostas
-- Apontar erros
-- Dar nota de 0 a 10
-- Explicar os erros de forma simples
-`
-        },
-        {
           role: "user",
-          content: conteudo
+          content: [
+            {
+              type: "input_text",
+              text: pergunta || "Corrija a prova e dê a nota"
+            },
+            {
+              type: "input_image",
+              image_url: img
+            }
+          ]
         }
       ]
     });
@@ -62,7 +44,7 @@ Tarefas:
     });
 
   } catch (error) {
-    console.error("ERRO IA:", error);
+    console.error(error);
 
     return Response.json({
       erro: "Erro na IA",
