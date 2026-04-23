@@ -23,7 +23,9 @@ Questão 1 - Alternativa: X`;
       method: "POST",
       headers: {
         "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://seu-app.vercel.app",
+        "X-Title": "CorrigeProva"
       },
       body: JSON.stringify({
         model: "openai/gpt-4o-mini",
@@ -49,6 +51,23 @@ Questão 1 - Alternativa: X`;
     });
 
     const data = await res.json();
+
+    console.log("OPENROUTER:", data);
+
+    // 🔥 DEBUG COMPLETO
+    if (!data || Object.keys(data).length === 0) {
+      return Response.json({
+        erro: "Resposta vazia da API",
+        detalhe: "Nenhum dado retornado"
+      });
+    }
+
+    if (data.error) {
+      return Response.json({
+        erro: "Erro da API",
+        detalhe: JSON.stringify(data.error)
+      });
+    }
 
     const resposta = data?.choices?.[0]?.message?.content;
 
