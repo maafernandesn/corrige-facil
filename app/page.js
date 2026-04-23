@@ -21,8 +21,8 @@ export default function Home() {
 
       const data = await r.json();
 
-      // 🔥 MOSTRA TUDO (ERRO OU SUCESSO)
-      setResposta(JSON.stringify(data, null, 2));
+      // 🔥 MOSTRA RESULTADO BONITO
+      setResposta(data.resultado || data.erro || "Sem resposta");
 
     } catch (e) {
       setResposta("Erro na conexão ❌");
@@ -30,14 +30,19 @@ export default function Home() {
   };
 
   return (
-    <div style={{ padding: 20 }}>
-      <h1>📸 CorrigeFácil IA</h1>
+    <div style={{ padding: 20, maxWidth: 600, margin: "0 auto" }}>
+      <h1 style={{ textAlign: "center" }}>📸 CorrigeFácil IA</h1>
 
       <textarea
-        placeholder="Gabarito (opcional) Ex: 1-C,2-D"
+        placeholder="Gabarito (opcional) Ex: 1-C,2-D,3-A"
         value={gabarito}
         onChange={(e) => setGabarito(e.target.value)}
-        style={{ width: "100%", height: 80 }}
+        style={{
+          width: "100%",
+          height: 80,
+          marginBottom: 10,
+          padding: 10
+        }}
       />
 
       <input
@@ -56,7 +61,7 @@ export default function Home() {
             imgEl.onload = () => {
               const canvas = document.createElement("canvas");
 
-              const maxWidth = 600;
+              const maxWidth = 800;
               const scale = maxWidth / imgEl.width;
 
               canvas.width = maxWidth;
@@ -65,7 +70,7 @@ export default function Home() {
               const ctx = canvas.getContext("2d");
               ctx.drawImage(imgEl, 0, 0, canvas.width, canvas.height);
 
-              const compressed = canvas.toDataURL("image/jpeg", 0.7);
+              const compressed = canvas.toDataURL("image/jpeg", 0.8);
 
               setImg(compressed);
             };
@@ -73,15 +78,37 @@ export default function Home() {
 
           reader.readAsDataURL(file);
         }}
+        style={{ marginBottom: 10 }}
       />
 
-      <button onClick={enviar} style={{ marginTop: 10 }}>
+      <button
+        onClick={enviar}
+        style={{
+          width: "100%",
+          padding: 12,
+          background: "#0070f3",
+          color: "#fff",
+          border: "none",
+          borderRadius: 6,
+          cursor: "pointer",
+          fontSize: 16
+        }}
+      >
         Corrigir
       </button>
 
-      <pre style={{ marginTop: 20, whiteSpace: "pre-wrap" }}>
+      <div
+        style={{
+          marginTop: 20,
+          padding: 15,
+          background: "#f5f5f5",
+          borderRadius: 8,
+          whiteSpace: "pre-wrap",
+          minHeight: 100
+        }}
+      >
         {resposta}
-      </pre>
+      </div>
     </div>
   );
 }
