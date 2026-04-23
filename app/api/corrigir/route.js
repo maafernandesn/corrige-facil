@@ -16,78 +16,93 @@ export async function POST(req) {
     });
 
     const ocrData = await ocrResponse.json();
-
-    if (!ocrData || ocrData.IsErroredOnProcessing) {
-      return Response.json({ erro: "Erro no OCR" });
-    }
-
     const texto = ocrData?.ParsedResults?.[0]?.ParsedText;
 
     if (!texto) {
       return Response.json({ erro: "Não consegui ler a imagem" });
     }
 
-    const linhas = texto.split("\n").map(l => l.trim()).filter(Boolean);
+    const linhas = texto
+      .split("\n")
+      .map(l => l.trim())
+      .filter(Boolean);
 
-    let alternativas = [];
-    const letras = ["A", "B", "C", "D"];
+    let questoes = [];
+    let bloco = [];
 
-    // pega alternativas simples
-    for (let i = 0; i < linhas.length; i++) {
-      const l = linhas[i];
-
-      if (
-        l.startsWith("A") ||
-        l.startsWith("B") ||
-        l.startsWith("C") ||
-        l.startsWith("D") ||
-        l.includes("*") ||
-        l.includes("•") ||
-        l.includes("X") ||
-        l.includes("/")
-      ) {
-        alternativas.push(l);
+    // 🔥 separar blocos por números (01), 02), etc
+    linhas.forEach(l => {
+      if (/^\d+/.test(l) && bloco.length > 0) {
+        questoes.push(bloco);
+        bloco = [];
       }
-    }
+      bloco.push(l);
+    });
 
-    let respostaAluno = null;
+    if (bloco.length > 0) questoes.push(bloco);
 
-    for (let i = 0; i < alternativas.length; i++) {
-      const alt = alternativas[i];
+    let respostas = [];
 
-      if (
-        alt.includes("*") ||
-        alt.includes("•") ||
-        alt.includes("X") ||
-        alt.includes("/")
-      ) {
-        respostaAluno = letras[i] || null;
-        break;
-      }
-    }
+    // 🔥 detectar resposta em cada questão
+    questoes.forEach(q => {
+      let alternativas = q.filter(l =>
+        l.length < 50 // ignora enunciado grande
+      );
 
-    if (!respostaAluno) {
+      let resposta = null;
+
+      alternativas.forEach((alt, index) => {
+        if (
+          alt.includes("*") ||
+          alt.includes("•") ||
+          alt.includes("X") ||
+          alt.includes("/")
+        ) {
+          const letras = ["A", "B", "C", "D"];
+          resposta = letras[index];
+        }
+      });
+
+      respostas.push(resposta);
+    });
+
+    if (!gabarito) {
       return Response.json({
-        resultado: "Não consegui identificar resposta.\n\n" + texto
+        resultado: "Detectado: " + respostas.join(", ")
       });
     }
 
-    const partes = gabarito.split("-");
-    const correta = partes[1]?.trim().toUpperCase();
+    const gabaritoArr = gabarito.split(",");
 
     let resultado = "📄 Correção\n\n";
+    let acertos = 0;
 
-    if (respostaAluno === correta) {
-      resultado += `Questão ${partes[0]} - Correta ✅\n🎯 Nota: 10`;
-    } else {
-      resultado += `Questão ${partes[0]} - Errada ❌ (${respostaAluno})\n🎯 Nota: 0`;
-    }
+    respostas.forEach((resp, i) => {
+      const correta = gabaritoArr[i]?.split("-")[1]?.trim().toUpperCase();
+
+      if (!resp) {
+        resultado += `${i + 1} - Não identificado ⚠️\n`;
+        return;
+      }
+
+      if (resp === correta) {
+        acertos++;
+        resultado += `${i + 1} - Correta ✅\n`;
+      } else {
+        resultado += `${i + 1} - Errada ❌ (${resp})\n`;
+      }
+    });
+
+    const nota = ((acertos / respostas.length) * 10).toFixed(1);
+
+    resultado += `\n🎯 Nota final: ${nota}`;
 
     return Response.json({ resultado });
 
   } catch (error) {
     return Response.json({
-      erro: "Erro no processamento"
+      erro: "Erro no processamento",
+      detalhe: error.message
     });
   }
 }
