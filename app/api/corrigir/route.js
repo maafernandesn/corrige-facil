@@ -16,6 +16,20 @@ export async function POST(req) {
 
     const base64 = img.split(",")[1];
 
+    const prompt = `
+Você é um professor do ensino fundamental.
+
+Analise a prova enviada na imagem.
+
+Faça o seguinte:
+1. Identifique as questões
+2. Diga o que está certo e errado
+3. Dê uma nota de 0 a 10
+4. Explique brevemente os erros
+
+Responda sempre em texto.
+`;
+
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
       {
@@ -27,9 +41,7 @@ export async function POST(req) {
           contents: [
             {
               parts: [
-                {
-                  text: pergunta || "Corrija esta prova e dê a nota"
-                },
+                { text: pergunta || prompt },
                 {
                   inline_data: {
                     mime_type: "image/jpeg",
@@ -45,12 +57,11 @@ export async function POST(req) {
 
     const data = await response.json();
 
-    console.log("RESPOSTA GEMINI:", JSON.stringify(data, null, 2));
+    console.log("GEMINI:", JSON.stringify(data, null, 2));
 
-    // 🔥 tenta extrair resposta de forma segura
     let texto = "Sem resposta da IA";
 
-    if (data.candidates && data.candidates.length > 0) {
+    if (data?.candidates?.length) {
       const parts = data.candidates[0].content?.parts;
 
       if (parts && parts.length > 0) {
