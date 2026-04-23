@@ -3,18 +3,18 @@
 import { useState } from "react";
 
 export default function Home() {
-  const [imgs, setImgs] = useState([]);
+  const [img, setImg] = useState(null);
   const [pergunta, setPergunta] = useState("");
   const [resposta, setResposta] = useState("");
 
   const enviar = async () => {
-    if (!imgs.length) {
-      alert("Envie pelo menos uma imagem");
+    if (!img) {
+      alert("Envie uma imagem");
       return;
     }
 
     try {
-      setResposta("Analisando imagens... ⏳");
+      setResposta("Analisando... ⏳");
 
       const baseUrl = window.location.origin;
 
@@ -23,7 +23,7 @@ export default function Home() {
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ imgs, pergunta })
+        body: JSON.stringify({ img, pergunta })
       });
 
       const data = await r.json();
@@ -36,93 +36,61 @@ export default function Home() {
       );
 
     } catch (err) {
-      console.error("ERRO REAL:", err);
+      console.error(err);
       setResposta("Erro na conexão ❌");
     }
   };
 
   return (
-    <div style={{ padding: 20, fontFamily: "Arial" }}>
+    <div style={{ padding: 20 }}>
       <h1>📸 CorrigeFácil IA</h1>
 
       <textarea
-        placeholder="Ex: Corrija as provas e dê a nota"
+        placeholder="Ex: Corrija a prova e dê a nota"
         value={pergunta}
         onChange={(e) => setPergunta(e.target.value)}
-        style={{
-          width: "100%",
-          height: 80,
-          marginBottom: 10,
-          padding: 10
-        }}
+        style={{ width: "100%", height: 80 }}
       />
 
       <input
         type="file"
         accept="image/*"
-        multiple
         onChange={(e) => {
-          const files = Array.from(e.target.files);
+          const file = e.target.files[0];
 
-          files.forEach(file => {
-            const img = new Image();
-            const reader = new FileReader();
+          if (!file) return;
 
-            reader.onload = (event) => {
-              img.src = event.target.result;
-            };
+          const imgEl = new Image();
+          const reader = new FileReader();
 
-            img.onload = () => {
-              const canvas = document.createElement("canvas");
+          reader.onload = (event) => {
+            imgEl.src = event.target.result;
+          };
 
-              const maxWidth = 800;
-              const scale = maxWidth / img.width;
+          imgEl.onload = () => {
+            const canvas = document.createElement("canvas");
 
-              canvas.width = maxWidth;
-              canvas.height = img.height * scale;
+            const maxWidth = 600; // 🔥 mais leve
+            const scale = maxWidth / imgEl.width;
 
-              const ctx = canvas.getContext("2d");
-              ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            canvas.width = maxWidth;
+            canvas.height = imgEl.height * scale;
 
-              const compressed = canvas.toDataURL("image/jpeg", 0.7);
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(imgEl, 0, 0, canvas.width, canvas.height);
 
-              setImgs(prev => [...prev, compressed]);
-            };
+            const compressed = canvas.toDataURL("image/jpeg", 0.6);
 
-            reader.readAsDataURL(file);
-          });
+            setImg(compressed);
+          };
+
+          reader.readAsDataURL(file);
         }}
-        style={{ marginBottom: 10 }}
       />
 
-      <p>{imgs.length} imagem(ns) selecionada(s)</p>
+      <button onClick={enviar}>Enviar</button>
 
-      <button
-        onClick={enviar}
-        style={{
-          width: "100%",
-          padding: 15,
-          backgroundColor: "#2563eb",
-          color: "white",
-          border: "none",
-          borderRadius: 10,
-          fontSize: 16
-        }}
-      >
-        Enviar
-      </button>
-
-      <pre
-        style={{
-          marginTop: 20,
-          background: "#f3f3f3",
-          padding: 10,
-          borderRadius: 10,
-          whiteSpace: "pre-wrap"
-        }}
-      >
-        {resposta}
-      </pre>
+      <pre style={{ marginTop: 20 }}>{resposta}</pre>
     </div>
   );
 }
