@@ -6,37 +6,34 @@ export async function POST(req) {
       return Response.json({ erro: "Imagem não enviada" });
     }
 
-    // 🔥 REDUZ TAMANHO (evita travar)
-    const base64 = img.split(",")[1].substring(0, 300000);
-
-    // OCR mais rápido
+    // OCR (sem cortar imagem)
     const ocrResponse = await fetch("https://api.ocr.space/parse/image", {
       method: "POST",
       headers: {
         apikey: "helloworld",
         "Content-Type": "application/x-www-form-urlencoded"
       },
-      body: `base64Image=data:image/jpeg;base64,${base64}&language=eng&OCREngine=1`
+      body: `base64Image=${encodeURIComponent(img)}&language=por&OCREngine=2&scale=true&detectOrientation=true`
     });
 
     const ocrData = await ocrResponse.json();
 
     const texto = ocrData?.ParsedResults?.[0]?.ParsedText;
 
-    if (!texto) {
+    console.log("OCR TEXTO:", texto);
+
+    if (!texto || texto.trim().length < 3) {
       return Response.json({
-        erro: "OCR não conseguiu ler"
+        resultado: "⚠️ Não consegui ler bem a imagem.\n\nTente:\n- tirar foto mais perto\n- melhorar iluminação\n- evitar sombra\n\nOu envie uma imagem mais nítida."
       });
     }
 
-    console.log("OCR:", texto);
-
-    // 🔍 pega respostas
+    // pega respostas tipo "1 A"
     const respostasAluno = texto.match(/\d+\s*[A-D]/gi) || [];
 
     if (!gabarito) {
       return Response.json({
-        resultado: "Texto identificado:\n\n" + texto
+        resultado: `Texto identificado:\n\n${texto}`
       });
     }
 
@@ -54,7 +51,6 @@ export async function POST(req) {
 
     respostasAluno.forEach(item => {
       const match = item.match(/(\d+)\s*([A-D])/i);
-
       if (!match) return;
 
       const num = match[1];
@@ -77,10 +73,8 @@ export async function POST(req) {
     return Response.json({ resultado });
 
   } catch (error) {
-    console.error(error);
-
     return Response.json({
-      erro: "Erro no processamento (timeout ou imagem pesada)",
+      erro: "Erro no processamento",
       detalhe: error.message
     });
   }
