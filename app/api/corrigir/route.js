@@ -6,24 +6,34 @@ export async function POST(req) {
       return Response.json({ erro: "Imagem não enviada" });
     }
 
-    // 🔥 IA só lê respostas
-    const prompt = `
-Leia a imagem de uma prova objetiva.
+    // 🧠 ETAPA 1 — EXTRAIR QUESTÕES
+    const promptExtracao = `
+Analise a imagem de uma prova escolar.
 
-REGRAS:
-- Cada questão tem alternativas A, B, C, D
-- O aluno marca com X, risco ou círculo
-- Identifique VISUALMENTE a alternativa marcada
-- NÃO inventar padrão
+Para cada questão:
+- Identifique o número
+- Identifique o tipo:
+  - multipla_escolha
+  - dissertativa
+- Identifique a resposta do aluno
 
-Responda SOMENTE assim:
-1-A,2-B,3-C,4-D
+Responda em JSON:
 
-Se não tiver certeza:
-1-?,2-B,3-?,4-D
+[
+  {
+    "numero": 1,
+    "tipo": "multipla_escolha",
+    "resposta": "A"
+  },
+  {
+    "numero": 2,
+    "tipo": "dissertativa",
+    "resposta": "texto do aluno"
+  }
+]
 `;
 
-    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    const extracao = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
@@ -37,43 +47,30 @@ Se não tiver certeza:
           {
             role: "user",
             content: [
-              { type: "text", text: prompt },
-              {
-                type: "image_url",
-                image_url: { url: img }
-              }
+              { type: "text", text: promptExtracao },
+              { type: "image_url", image_url: { url: img } }
             ]
           }
         ]
       })
     });
 
-    const data = await res.json();
+    const dataExtracao = await extracao.json();
 
-    if (data.error) {
+    let questoes;
+
+    try {
+      questoes = JSON.parse(
+        dataExtracao.choices[0].message.content
+      );
+    } catch {
       return Response.json({
-        erro: "Erro da API",
-        detalhe: data.error.message
+        erro: "Erro ao interpretar prova",
+        detalhe: dataExtracao
       });
     }
 
-    const texto = data?.choices?.[0]?.message?.content;
-
-    if (!texto) {
-      return Response.json({
-        erro: "IA não respondeu",
-        detalhe: JSON.stringify(data)
-      });
-    }
-
-    // 🔥 respostas do aluno
-    const respostasAluno = {};
-    texto.split(",").forEach(par => {
-      const [q, r] = par.trim().split("-");
-      if (q && r) respostasAluno[q] = r.toUpperCase();
-    });
-
-    // 🔥 gabarito
+    // 🔥 GABARITO
     const respostasCorretas = {};
     if (gabarito) {
       gabarito.split(",").forEach(par => {
@@ -84,37 +81,82 @@ Se não tiver certeza:
 
     let resultado = "📄 Correção\n\n";
     let acertos = 0;
-    let total = Object.keys(respostasCorretas).length;
+    let total = 0;
 
-    if (!gabarito) {
-      Object.keys(respostasAluno).forEach(q => {
-        resultado += `Questão ${q} - Alternativa: ${respostasAluno[q]}\n`;
-      });
+    // 🔥 ETAPA 2 — CORREÇÃO
+    for (const q of questoes) {
+      const num = q.numero;
+      const tipo = q.tipo;
+      const resposta = q.resposta;
 
-      return Response.json({ resultado });
+      // 🟢 MULTIPLA ESCOLHA
+      if (tipo === "multipla_escolha" && respostasCorretas[num]) {
+        total++;
+
+        const correta = respostasCorretas[num];
+
+        if (resposta === correta) {
+          resultado += `Questão ${num} - ✅ Correta (${resposta})\n`;
+          acertos++;
+        } else {
+          resultado += `Questão ${num} - ❌ Errada (${resposta}) | Correta: ${correta}\n`;
+        }
+      }
+
+      // 🔵 DISSERTATIVA
+      if (tipo === "dissertativa") {
+        total++;
+
+        const promptCorrecao = `
+Corrija a resposta de um aluno do ensino fundamental.
+
+Resposta do aluno:
+"${resposta}"
+
+Dê:
+- nota de 0 a 1
+- comentário simples
+
+Formato:
+Nota: 0.8
+Comentário: ...
+`;
+
+        const correcao = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            model: "openai/gpt-4o-mini",
+            messages: [
+              {
+                role: "user",
+                content: promptCorrecao
+              }
+            ]
+          })
+        });
+
+        const dataCorr = await correcao.json();
+
+        const texto = dataCorr?.choices?.[0]?.message?.content || "";
+
+        const match = texto.match(/Nota:\s*(\d+(\.\d+)?)/);
+        const nota = match ? parseFloat(match[1]) : 0;
+
+        acertos += nota;
+
+        resultado += `Questão ${num} - 📝 Dissertativa (${nota})\n`;
+        resultado += `${texto}\n\n`;
+      }
     }
 
-    Object.keys(respostasCorretas).forEach(q => {
-      const aluno = respostasAluno[q];
-      const correta = respostasCorretas[q];
+    const notaFinal = total > 0 ? ((acertos / total) * 10).toFixed(1) : 0;
 
-      if (!aluno || aluno === "?") {
-        resultado += `Questão ${q} - ⚠️ Não identificada\n`;
-        return;
-      }
-
-      if (aluno === correta) {
-        resultado += `Questão ${q} - ✅ Correta (${aluno})\n`;
-        acertos++;
-      } else {
-        resultado += `Questão ${q} - ❌ Errada (${aluno}) | Correta: ${correta}\n`;
-      }
-    });
-
-    const nota = total > 0 ? ((acertos / total) * 10).toFixed(1) : 0;
-
-    resultado += `\n📊 Acertos: ${acertos}/${total}`;
-    resultado += `\n🎯 Nota final: ${nota}`;
+    resultado += `\n📊 Resultado: ${acertos.toFixed(1)}/${total}`;
+    resultado += `\n🎯 Nota final: ${notaFinal}`;
 
     return Response.json({ resultado });
 
