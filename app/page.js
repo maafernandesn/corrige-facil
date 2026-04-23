@@ -7,10 +7,9 @@ export default function Home() {
   const [gabarito, setGabarito] = useState("");
   const [resposta, setResposta] = useState("");
 
-
   const enviar = async () => {
     if (!img || !gabarito) {
-      alert("Envie imagem e gabarito");
+      alert("Envie a imagem e o gabarito");
       return;
     }
 
@@ -34,7 +33,6 @@ export default function Home() {
     }
   };
 
-
   return (
     <div style={{ padding: 20 }}>
       <h1>📸 CorrigeFácil</h1>
@@ -49,7 +47,6 @@ export default function Home() {
       <input
         type="file"
         accept="image/*"
-        capture="environment"
         onChange={(e) => {
           const file = e.target.files[0];
           if (!file) return;
