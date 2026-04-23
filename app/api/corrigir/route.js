@@ -6,120 +6,90 @@ export async function POST(req) {
       return Response.json({ erro: "Imagem não enviada" });
     }
 
-    // OCR
+    // 🔥 REDUZ IMAGEM (acelera MUITO)
+    const base64 = img.split(",")[1].substring(0, 200000);
+
     const ocrResponse = await fetch("https://api.ocr.space/parse/image", {
       method: "POST",
       headers: {
         apikey: "helloworld",
         "Content-Type": "application/x-www-form-urlencoded"
       },
-      body: `base64Image=${encodeURIComponent(img)}&language=por&OCREngine=2&scale=true`
+      body: `base64Image=data:image/jpeg;base64,${base64}&language=eng&OCREngine=1`
     });
 
     const ocrData = await ocrResponse.json();
 
-    if (!ocrData || ocrData.IsErroredOnProcessing) {
-      return Response.json({
-        erro: "Erro no OCR",
-        detalhe: JSON.stringify(ocrData)
-      });
-    }
-
-    const texto = ocrData.ParsedResults?.[0]?.ParsedText;
+    const texto = ocrData?.ParsedResults?.[0]?.ParsedText;
 
     if (!texto) {
       return Response.json({
-        erro: "OCR não retornou texto"
+        erro: "OCR não conseguiu ler"
       });
     }
 
-    const linhas = texto
-      .split("\n")
-      .map(l => l.trim())
-      .filter(Boolean);
+    console.log("OCR:", texto);
 
-    console.log("LINHAS:", linhas);
+    const linhas = texto.split("\n").map(l => l.trim()).filter(Boolean);
 
     const letras = ["A", "B", "C", "D"];
-    let respostasDetectadas = [];
+    let respostas = [];
+    let temp = [];
 
-    let alternativasTemp = [];
-
-    linhas.forEach(linha => {
-      // pega alternativas
-      if (/^[A-D]\)/i.test(linha) || linha.includes("•")) {
-        alternativasTemp.push(linha);
+    linhas.forEach(l => {
+      if (/^[A-D]/i.test(l) || l.includes("•")) {
+        temp.push(l);
       }
 
-      // quando tem 4 alternativas → é uma questão
-      if (alternativasTemp.length === 4) {
-        let resposta = null;
+      if (temp.length === 4) {
+        let resp = null;
 
-        alternativasTemp.forEach((alt, index) => {
-          if (
-            alt.includes("•") ||
-            alt.includes("X") ||
-            alt.includes("/") ||
-            alt.includes("*")
-          ) {
-            resposta = letras[index];
+        temp.forEach((alt, i) => {
+          if (alt.includes("•") || alt.includes("X") || alt.includes("/")) {
+            resp = letras[i];
           }
         });
 
-        respostasDetectadas.push(resposta);
-        alternativasTemp = [];
+        respostas.push(resp);
+        temp = [];
       }
     });
 
-    console.log("RESPOSTAS:", respostasDetectadas);
-
     if (!gabarito) {
       return Response.json({
-        resultado: "Respostas detectadas: " + respostasDetectadas.join(", ")
+        resultado: respostas.join(", ")
       });
     }
 
-    // GABARITO
     const gabaritoMap = {};
     gabarito.split(",").forEach(item => {
       const [q, r] = item.split("-");
-      if (q && r) {
-        gabaritoMap[q.trim()] = r.trim().toUpperCase();
-      }
+      gabaritoMap[q.trim()] = r.trim().toUpperCase();
     });
 
     let resultado = "📄 Correção\n\n";
     let acertos = 0;
-    let total = respostasDetectadas.length;
 
-    respostasDetectadas.forEach((resp, index) => {
-      const num = (index + 1).toString();
-      const correta = gabaritoMap[num];
+    respostas.forEach((r, i) => {
+      const correta = gabaritoMap[(i + 1).toString()];
 
-      if (!resp) {
-        resultado += `${num} - Não identificado ⚠️\n`;
-        return;
-      }
-
-      if (resp === correta) {
+      if (r === correta) {
         acertos++;
-        resultado += `${num} - Correta ✅\n`;
+        resultado += `${i + 1} - Correta ✅\n`;
       } else {
-        resultado += `${num} - Errada ❌ (${resp})\n`;
+        resultado += `${i + 1} - Errada ❌ (${r})\n`;
       }
     });
 
-    const nota = total > 0 ? ((acertos / total) * 10).toFixed(1) : 0;
+    const nota = ((acertos / respostas.length) * 10).toFixed(1);
 
-    resultado += `\n🎯 Nota final: ${nota}`;
+    resultado += `\n🎯 Nota: ${nota}`;
 
     return Response.json({ resultado });
 
   } catch (error) {
-    console.error("ERRO:", error);
-
     return Response.json({
-      erro: "Erro no processamento",
+      erro: "Erro (imagem grande demais)",
       detalhe: error.message
     });
   }
