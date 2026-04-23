@@ -6,7 +6,6 @@ export async function POST(req) {
       return Response.json({ erro: "Imagem não enviada" });
     }
 
-    // OCR
     const ocrResponse = await fetch("https://api.ocr.space/parse/image", {
       method: "POST",
       headers: {
@@ -23,12 +22,15 @@ export async function POST(req) {
       return Response.json({ erro: "Não consegui ler a imagem" });
     }
 
-    const linhas = texto.split("\n").map(l => l.trim()).filter(Boolean);
+    const linhas = texto
+      .split("\n")
+      .map(l => l.trim())
+      .filter(Boolean);
 
-    // 🔥 separar por questão
     let questoes = [];
     let atual = [];
 
+    // 🔥 separar questões
     linhas.forEach(l => {
       if (/^\d+\)/.test(l) && atual.length > 0) {
         questoes.push(atual);
@@ -39,17 +41,12 @@ export async function POST(req) {
 
     if (atual.length > 0) questoes.push(atual);
 
-    const letras = ["A", "B", "C", "D"];
     let respostas = [];
 
-    // 🔥 processar cada questão
+    // 🔥 detectar resposta por posição
     questoes.forEach(q => {
       let alternativas = q.filter(l =>
-        /^[A-D]\)/i.test(l) ||
-        l.includes("*") ||
-        l.includes("•") ||
-        l.includes("X") ||
-        l.includes("/")
+        l.length < 40 // ignora enunciado grande
       );
 
       let resposta = null;
@@ -61,6 +58,7 @@ export async function POST(req) {
           alt.includes("X") ||
           alt.includes("/")
         ) {
+          const letras = ["A", "B", "C", "D"];
           resposta = letras[i];
         }
       });
@@ -70,11 +68,10 @@ export async function POST(req) {
 
     if (!gabarito) {
       return Response.json({
-        resultado: "Respostas detectadas: " + respostas.join(", ")
+        resultado: "Detectado: " + respostas.join(", ")
       });
     }
 
-    // 🔥 corrigir
     const gabaritoArr = gabarito.split(",");
 
     let resultado = "📄 Correção\n\n";
