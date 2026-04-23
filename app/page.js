@@ -7,35 +7,33 @@ export default function Home() {
   const [gabarito, setGabarito] = useState("");
   const [resposta, setResposta] = useState("");
 
-  const processar = () => {
+
+  const enviar = async () => {
     if (!img || !gabarito) {
       alert("Envie imagem e gabarito");
       return;
     }
 
-    // 🔥 simulação OCR leve (funciona no seu caso)
-    const texto = img; // já vem como base64 mas vamos simular leitura
+    try {
+      setResposta("Corrigindo... ⏳");
 
-    // 🔥 lógica de marcação simples
-    let respostaAluno = null;
+      const r = await fetch("/api/corrigir", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ img, gabarito })
+      });
 
-    if (texto.includes("•") || texto.includes("X") || texto.includes("/")) {
-      // exemplo simplificado: assume C (ajustável depois)
-      respostaAluno = "C";
+      const data = await r.json();
+
+      setResposta(data.resultado || data.erro || "Sem resposta");
+
+    } catch (e) {
+      setResposta("Erro na conexão ❌");
     }
-
-    const [q, correta] = gabarito.split("-");
-
-    let resultado = "📄 Correção\n\n";
-
-    if (respostaAluno === correta.trim().toUpperCase()) {
-      resultado += `Questão ${q} - Correta ✅\n🎯 Nota: 10`;
-    } else {
-      resultado += `Questão ${q} - Errada ❌ (${respostaAluno})\n🎯 Nota: 0`;
-    }
-
-    setResposta(resultado);
   };
+
 
   return (
     <div style={{ padding: 20 }}>
@@ -54,17 +52,43 @@ export default function Home() {
         capture="environment"
         onChange={(e) => {
           const file = e.target.files[0];
+          if (!file) return;
+
           const reader = new FileReader();
-          reader.onloadend = () => setImg(reader.result);
+
+          reader.onload = (event) => {
+            const imgEl = new Image();
+            imgEl.src = event.target.result;
+
+            imgEl.onload = () => {
+              const canvas = document.createElement("canvas");
+
+              const maxWidth = 600;
+              const scale = maxWidth / imgEl.width;
+
+              canvas.width = maxWidth;
+              canvas.height = imgEl.height * scale;
+
+              const ctx = canvas.getContext("2d");
+              ctx.drawImage(imgEl, 0, 0, canvas.width, canvas.height);
+
+              const compressed = canvas.toDataURL("image/jpeg", 0.7);
+
+              setImg(compressed);
+            };
+          };
+
           reader.readAsDataURL(file);
         }}
       />
 
-      <button onClick={processar} style={{ marginTop: 10 }}>
+      <button onClick={enviar} style={{ marginTop: 10 }}>
         Corrigir
       </button>
 
-      <pre style={{ marginTop: 20 }}>{resposta}</pre>
+      <pre style={{ marginTop: 20, whiteSpace: "pre-wrap" }}>
+        {resposta}
+      </pre>
     </div>
   );
 }
