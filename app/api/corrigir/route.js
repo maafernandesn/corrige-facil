@@ -2,17 +2,22 @@ import OpenAI from "openai";
 
 export async function POST(req) {
   try {
-    const { img, pergunta } = await req.json();
+    const body = await req.json();
+
+    console.log("BODY:", body);
+
+    const img = body.img;
+    const pergunta = body.pergunta || "Corrija a prova";
 
     if (!process.env.OPENAI_API_KEY) {
       return Response.json({
-        erro: "Chave OpenAI não configurada"
+        erro: "SEM CHAVE OPENAI"
       });
     }
 
     if (!img) {
       return Response.json({
-        erro: "Imagem não enviada"
+        erro: "SEM IMAGEM"
       });
     }
 
@@ -28,7 +33,7 @@ export async function POST(req) {
           content: [
             {
               type: "input_text",
-              text: pergunta || "Corrija a prova e dê a nota"
+              text: pergunta
             },
             {
               type: "input_image",
@@ -39,16 +44,18 @@ export async function POST(req) {
       ]
     });
 
+    console.log("RESPOSTA IA:", response);
+
     return Response.json({
-      resultado: response.output_text
+      resultado: response.output_text || "Sem resposta da IA"
     });
 
   } catch (error) {
-    console.error(error);
+    console.error("ERRO REAL COMPLETO:", error);
 
     return Response.json({
       erro: "Erro na IA",
-      detalhe: error.message
+      detalhe: JSON.stringify(error, null, 2)
     });
   }
 }
