@@ -6,90 +6,95 @@ export async function POST(req) {
       return Response.json({ erro: "Imagem não enviada" });
     }
 
-    // 🔥 REDUZ IMAGEM (acelera MUITO)
-    const base64 = img.split(",")[1].substring(0, 200000);
-
+    // OCR (SEM cortar imagem)
     const ocrResponse = await fetch("https://api.ocr.space/parse/image", {
       method: "POST",
       headers: {
         apikey: "helloworld",
         "Content-Type": "application/x-www-form-urlencoded"
       },
-      body: `base64Image=data:image/jpeg;base64,${base64}&language=eng&OCREngine=1`
+      body: `base64Image=${encodeURIComponent(img)}&language=por&OCREngine=2&scale=true&detectOrientation=true`
     });
 
     const ocrData = await ocrResponse.json();
 
-    const texto = ocrData?.ParsedResults?.[0]?.ParsedText;
+    console.log("OCR:", ocrData);
 
-    if (!texto) {
+    if (!ocrData || ocrData.IsErroredOnProcessing) {
       return Response.json({
-        erro: "OCR não conseguiu ler"
+        erro: "Erro no OCR",
+        detalhe: JSON.stringify(ocrData)
       });
     }
 
-    console.log("OCR:", texto);
+    const texto = ocrData.ParsedResults?.[0]?.ParsedText;
 
-    const linhas = texto.split("\n").map(l => l.trim()).filter(Boolean);
+    if (!texto || texto.trim().length < 5) {
+      return Response.json({
+        erro: "OCR não conseguiu ler a imagem",
+        detalhe: texto
+      });
+    }
+
+    const linhas = texto
+      .split("\n")
+      .map(l => l.trim())
+      .filter(Boolean);
 
     const letras = ["A", "B", "C", "D"];
-    let respostas = [];
-    let temp = [];
+    let alternativas = [];
 
+    // pegar alternativas
     linhas.forEach(l => {
-      if (/^[A-D]/i.test(l) || l.includes("•")) {
-        temp.push(l);
-      }
-
-      if (temp.length === 4) {
-        let resp = null;
-
-        temp.forEach((alt, i) => {
-          if (alt.includes("•") || alt.includes("X") || alt.includes("/")) {
-            resp = letras[i];
-          }
-        });
-
-        respostas.push(resp);
-        temp = [];
+      if (/^[A-D]\)/i.test(l) || l.includes("•")) {
+        alternativas.push(l);
       }
     });
+
+    console.log("ALTERNATIVAS:", alternativas);
+
+    let respostaAluno = null;
+
+    alternativas.forEach((alt, i) => {
+      if (
+        alt.includes("•") ||
+        alt.includes("X") ||
+        alt.includes("/") ||
+        alt.includes("*")
+      ) {
+        respostaAluno = letras[i];
+      }
+    });
+
+    if (!respostaAluno) {
+      return Response.json({
+        resultado: `⚠️ Não consegui identificar a resposta marcada.\n\nTexto:\n${texto}`
+      });
+    }
 
     if (!gabarito) {
       return Response.json({
-        resultado: respostas.join(", ")
+        resultado: `Resposta detectada: ${respostaAluno}`
       });
     }
 
-    const gabaritoMap = {};
-    gabarito.split(",").forEach(item => {
-      const [q, r] = item.split("-");
-      gabaritoMap[q.trim()] = r.trim().toUpperCase();
-    });
+    const [q, correta] = gabarito.split("-");
 
     let resultado = "📄 Correção\n\n";
-    let acertos = 0;
 
-    respostas.forEach((r, i) => {
-      const correta = gabaritoMap[(i + 1).toString()];
-
-      if (r === correta) {
-        acertos++;
-        resultado += `${i + 1} - Correta ✅\n`;
-      } else {
-        resultado += `${i + 1} - Errada ❌ (${r})\n`;
-      }
-    });
-
-    const nota = ((acertos / respostas.length) * 10).toFixed(1);
-
-    resultado += `\n🎯 Nota: ${nota}`;
+    if (respostaAluno === correta.trim().toUpperCase()) {
+      resultado += `Questão ${q} - Correta ✅\n🎯 Nota: 10`;
+    } else {
+      resultado += `Questão ${q} - Errada ❌ (${respostaAluno})\n🎯 Nota: 0`;
+    }
 
     return Response.json({ resultado });
 
   } catch (error) {
+    console.error("ERRO:", error);
+
     return Response.json({
-      erro: "Erro (imagem grande demais)",
+      erro: "Erro no processamento",
       detalhe: error.message
     });
   }
