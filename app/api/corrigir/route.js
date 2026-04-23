@@ -6,17 +6,16 @@ export async function POST(req) {
       return Response.json({ erro: "Imagem não enviada" });
     }
 
-    // 🔑 OCR grátis
     const OCR_API_KEY = "helloworld";
 
-    // 🔍 OCR com melhorias
+    // 🔍 OCR
     const ocrResponse = await fetch("https://api.ocr.space/parse/image", {
       method: "POST",
       headers: {
         apikey: OCR_API_KEY,
         "Content-Type": "application/x-www-form-urlencoded"
       },
-      body: `base64Image=${encodeURIComponent(img)}&language=por&isOverlayRequired=false&detectOrientation=true&scale=true&OCREngine=2`
+      body: `base64Image=${encodeURIComponent(img)}&language=por&detectOrientation=true&scale=true&OCREngine=2`
     });
 
     const ocrData = await ocrResponse.json();
@@ -27,7 +26,7 @@ export async function POST(req) {
 
     if (!texto || texto.trim().length < 10) {
       return Response.json({
-        erro: "Não foi possível ler o texto da imagem. Tente tirar uma foto mais clara."
+        erro: "Não foi possível ler o texto da imagem"
       });
     }
 
@@ -37,9 +36,9 @@ export async function POST(req) {
       });
     }
 
-    // 🤖 IA (apenas texto)
+    // 🤖 IA (modelo correto)
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
       {
         method: "POST",
         headers: {
@@ -57,7 +56,6 @@ Corrija a prova abaixo:
 
 ${texto}
 
-Faça:
 - Liste as questões
 - Diga o que está certo e errado
 - Dê nota de 0 a 10
@@ -73,10 +71,12 @@ Faça:
 
     const data = await response.json();
 
+    console.log("GEMINI:", data);
+
     return Response.json({
       resultado:
         data?.candidates?.[0]?.content?.parts?.[0]?.text ||
-        "Sem resposta da IA"
+        JSON.stringify(data)
     });
 
   } catch (error) {
