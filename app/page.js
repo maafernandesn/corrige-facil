@@ -29,8 +29,16 @@ export default function Home() {
   };
 
   return (
-    <div style={{ padding: 20, maxWidth: 600, margin: "0 auto" }}>
-      <h1 style={{ textAlign: "center" }}>📸 CorrigeFácil IA</h1>
+    <div style={{
+      padding: 20,
+      maxWidth: 600,
+      margin: "0 auto",
+      fontFamily: "Arial"
+    }}>
+      
+      <h1 style={{ textAlign: "center" }}>
+        📸 CorrigeFácil IA
+      </h1>
 
       <textarea
         placeholder="Gabarito (opcional) Ex: 1-A,2-C,3-D"
@@ -40,7 +48,9 @@ export default function Home() {
           width: "100%",
           height: 80,
           marginBottom: 10,
-          padding: 10
+          padding: 10,
+          borderRadius: 6,
+          border: "1px solid #ccc"
         }}
       />
 
@@ -69,7 +79,6 @@ export default function Home() {
               const ctx = canvas.getContext("2d");
               ctx.drawImage(imgEl, 0, 0, canvas.width, canvas.height);
 
-              // 🔥 MENOS COMPRESSÃO = MELHOR LEITURA
               const compressed = canvas.toDataURL("image/jpeg", 1.0);
 
               setImg(compressed);
@@ -85,28 +94,28 @@ export default function Home() {
         onClick={enviar}
         style={{
           width: "100%",
-          padding: 12,
+          padding: 14,
           background: "#0070f3",
           color: "#fff",
           border: "none",
-          borderRadius: 6,
+          borderRadius: 8,
           cursor: "pointer",
-          fontSize: 16
+          fontSize: 16,
+          fontWeight: "bold"
         }}
       >
-        Corrigir
+        Corrigir Prova
       </button>
 
-      <div
-        style={{
-          marginTop: 20,
-          padding: 15,
-          background: "#f5f5f5",
-          borderRadius: 8,
-          whiteSpace: "pre-wrap",
-          minHeight: 100
-        }}
-      >
+      <div style={{
+        marginTop: 20,
+        padding: 15,
+        background: "#f9f9f9",
+        borderRadius: 10,
+        border: "1px solid #ddd",
+        whiteSpace: "pre-wrap",
+        minHeight: 120
+      }}>
         {resposta}
       </div>
     </div>
