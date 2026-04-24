@@ -48,19 +48,26 @@ Não mude esse formato.
     });
 
     const data = await res.json();
-    const resposta = data?.choices?.[0]?.message?.content;
+    let resposta = data?.choices?.[0]?.message?.content;
 
     if (!resposta) {
       return Response.json({ erro: "IA não respondeu" });
     }
 
-    // 🧠 MODO PROFESSOR
+    // 🔥 NORMALIZAÇÃO TOTAL (ESSA É A CHAVE)
+    resposta = resposta
+      .replace(/\u00A0/g, " ") // remove espaço invisível
+      .replace(/\r/g, "")
+      .replace(/\*\*/g, "")
+      .trim();
+
+    // 🧠 PROFESSOR
     if (modo === "professor") {
       return Response.json({ resultado: resposta });
     }
 
-    // 🔥 EXTRAÇÃO ROBUSTA
-    const matches = [...resposta.matchAll(/Q(\d+)\s*:\s*([A-D])/gi)];
+    // 🔥 EXTRAÇÃO ULTRA ROBUSTA
+    const matches = [...resposta.matchAll(/Q\s*(\d+)\s*:\s*([A-D])/gi)];
 
     if (matches.length === 0) {
       return Response.json({
