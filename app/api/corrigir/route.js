@@ -23,8 +23,6 @@ GABARITO:
 Q2:C
 Q3:D
 Q4:D
-
-Não mude esse formato.
 `;
 
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -54,11 +52,13 @@ Não mude esse formato.
       return Response.json({ erro: "IA não respondeu" });
     }
 
-    // 🔥 NORMALIZAÇÃO TOTAL (ESSA É A CHAVE)
+    // 🔥 LIMPEZA FORTE
     resposta = resposta
-      .replace(/\u00A0/g, " ") // remove espaço invisível
+      .replace(/\u00A0/g, " ")     // espaço invisível
       .replace(/\r/g, "")
+      .replace(/\t/g, "")
       .replace(/\*\*/g, "")
+      .replace(/ +/g, " ")         // múltiplos espaços → 1
       .trim();
 
     // 🧠 PROFESSOR
@@ -66,18 +66,24 @@ Não mude esse formato.
       return Response.json({ resultado: resposta });
     }
 
-    // 🔥 EXTRAÇÃO ULTRA ROBUSTA
-    const matches = [...resposta.matchAll(/Q\s*(\d+)\s*:\s*([A-D])/gi)];
+    // 🔥 EXTRAÇÃO FLEXÍVEL (ESSA É A CHAVE)
+    const matches = resposta.match(/Q\s*\d+\s*:\s*[A-D]/gi);
 
-    if (matches.length === 0) {
+    if (!matches || matches.length === 0) {
       return Response.json({
         resultado: "⚠️ Não consegui extrair o gabarito."
       });
     }
 
     const corretas = {};
-    matches.forEach(m => {
-      corretas[m[1]] = m[2].toUpperCase();
+
+    matches.forEach(item => {
+      const clean = item.replace(/\s+/g, "");
+      const parts = clean.split(":"); // Q2:C
+      const numero = parts[0].replace("Q", "");
+      const letra = parts[1];
+
+      corretas[numero] = letra.toUpperCase();
     });
 
     // 🔥 respostas do aluno
@@ -96,21 +102,21 @@ Não mude esse formato.
       const respAluno = aluno[q];
 
       if (!respAluno) {
-        resultado += q + " - ⚠️ Sem resposta\n";
+        resultado += `${q} - ⚠️ Sem resposta\n`;
         return;
       }
 
       if (respAluno === correta) {
-        resultado += q + " - " + correta + " ✅\n";
+        resultado += `${q} - ${correta} ✅\n`;
         acertos++;
       } else {
-        resultado += q + " - " + respAluno + " ❌ (correta: " + correta + ")\n";
+        resultado += `${q} - ${respAluno} ❌ (correta: ${correta})\n`;
       }
     });
 
     const nota = ((acertos / total) * 10).toFixed(1);
 
-    resultado += "\n🎯 Nota: " + nota + " (" + acertos + "/" + total + ")";
+    resultado += `\n🎯 Nota: ${nota} (${acertos}/${total})`;
 
     return Response.json({ resultado });
 
