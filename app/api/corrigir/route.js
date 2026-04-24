@@ -16,9 +16,9 @@ Para cada pergunta:
 - analise as alternativas
 - explique qual está correta
 
-No final escreva:
+No final da resposta escreva EXATAMENTE:
 
-GABARITO:
+**** GABARITO ****
 Q2:C
 Q3:D
 Q4:D
@@ -51,7 +51,7 @@ Q4:D
       return Response.json({ erro: "IA não respondeu" });
     }
 
-    // 🧠 MODO PROFESSOR
+    // 🧠 modo professor
     if (modo === "professor") {
       return Response.json({ resultado: resposta });
     }
@@ -64,8 +64,8 @@ Q4:D
       .replace(/\*\*/g, "")
       .trim();
 
-    // 🔥 PEGA TUDO APÓS "GABARITO"
-    const partes = resposta.split("GABARITO:");
+    // 🔥 LOCALIZA MARCADOR ÚNICO
+    const partes = resposta.split("**** GABARITO ****");
 
     if (partes.length < 2) {
       return Response.json({
@@ -75,7 +75,7 @@ Q4:D
 
     const bloco = partes[1];
 
-    // 🔥 EXTRAI Q2:C etc
+    // 🔥 EXTRAÇÃO SUPER SEGURA
     const matches = bloco.match(/Q\s*\d+\s*:\s*[A-D]/gi);
 
     if (!matches) {
