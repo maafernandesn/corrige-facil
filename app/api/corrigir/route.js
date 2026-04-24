@@ -81,30 +81,23 @@ Repita para todas as questões.
     // ⚡ MODO FAST → extrai só respostas finais
     const respostas = [];
 
-    const regex = /Resposta final:\s*([A-D])/gi;
-    let match;
+// 🔥 pega TODAS as respostas finais (robusto)
+const matches = respostaCompleta.matchAll(/Resposta\s*final\s*:\s*([A-D])/gi);
 
-    let contador = 1;
+let contador = 1;
 
-    while ((match = regex.exec(respostaCompleta)) !== null) {
-      respostas.push(`${contador} - ${match[1]}`);
-      contador++;
-    }
-
-    if (respostas.length === 0) {
-      return Response.json({
-        resultado: "⚠️ Não consegui extrair as respostas."
-      });
-    }
-
-    return Response.json({
-      resultado: respostas.join("\n")
-    });
-
-  } catch (error) {
-    return Response.json({
-      erro: "Erro no servidor",
-      detalhe: error.message
-    });
-  }
+for (const m of matches) {
+  respostas.push(`${contador} - ${m[1].toUpperCase()}`);
+  contador++;
 }
+
+// 🔥 fallback caso regex falhe
+if (respostas.length === 0) {
+  return Response.json({
+    resultado: "⚠️ Não consegui extrair as respostas automaticamente."
+  });
+}
+
+return Response.json({
+  resultado: respostas.join("\n")
+});
