@@ -33,8 +33,6 @@ RESUMO:
 2:C
 3:D
 4:D
-
-(Sem explicação no resumo)
 `;
 
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -66,7 +64,7 @@ RESUMO:
       });
     }
 
-    const respostaCompleta = data?.choices?.[0]?.message?.content;
+    let respostaCompleta = data?.choices?.[0]?.message?.content;
 
     if (!respostaCompleta) {
       return Response.json({
@@ -75,38 +73,33 @@ RESUMO:
       });
     }
 
-    // 🧠 PROFESSOR
+    // 🔥 LIMPA MARKDOWN
+    respostaCompleta = respostaCompleta.replace(/\*\*/g, "").trim();
+
+    // 🧠 MODO PROFESSOR
     if (modo === "professor") {
       return Response.json({ resultado: respostaCompleta });
     }
 
-    // 🔥 FAST → pega RESUMO
-    const resumoMatch = respostaCompleta.match(/RESUMO:\s*([\s\S]*)/i);
+    // 🔥 EXTRAI APENAS LINHAS DO TIPO "2:C"
+    const linhasValidas = respostaCompleta.match(/\d+\s*:\s*[A-D]/gi);
 
-    if (!resumoMatch) {
+    if (!linhasValidas || linhasValidas.length === 0) {
       return Response.json({
         resultado: "⚠️ Não consegui extrair o resumo."
       });
     }
 
-    const linhas = resumoMatch[1].trim().split("\n");
-
     const corretas = {};
 
-    linhas.forEach(linha => {
+    linhasValidas.forEach(linha => {
       const match = linha.match(/(\d+)\s*:\s*([A-D])/i);
       if (match) {
         corretas[match[1]] = match[2].toUpperCase();
       }
     });
 
-    if (Object.keys(corretas).length === 0) {
-      return Response.json({
-        resultado: "⚠️ Resumo não identificado."
-      });
-    }
-
-    // 🔥 respostas do aluno
+    // 🔥 RESPOSTAS DO ALUNO
     const aluno = {};
     respostasAlunoStr.split(",").forEach(par => {
       const [q, r] = par.trim().split("-");
