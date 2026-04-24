@@ -16,9 +16,7 @@ Para cada pergunta:
 - analise as alternativas
 - explique qual está correta
 
-No final escreva um gabarito assim:
-
-GABARITO:
+Sempre indique claramente a alternativa correta no formato:
 Q2:C
 Q3:D
 Q4:D
@@ -51,37 +49,26 @@ Q4:D
       return Response.json({ erro: "IA não respondeu" });
     }
 
-    // 🧠 PROFESSOR
+    // 🧠 MODO PROFESSOR
     if (modo === "professor") {
       return Response.json({ resultado: resposta });
     }
 
-    // 🔥 NORMALIZA
+    // 🔥 LIMPEZA FORTE
     resposta = resposta
       .replace(/\u00A0/g, " ")
       .replace(/\r/g, "")
       .replace(/\t/g, "")
       .replace(/\*\*/g, "")
+      .replace(/ +/g, " ")
       .trim();
 
-    // 🔥 PROCURA GABARITO FLEXÍVEL
-    const regexBloco = /GABARITO[\s\S]*?(Q\s*\d+\s*:\s*[A-D][\s\S]*)/i;
-    const blocoMatch = resposta.match(regexBloco);
+    // 🔥 EXTRAÇÃO DIRETA (CHAVE DO SUCESSO)
+    const matches = resposta.match(/Q\s*\d+\s*:\s*[A-D]/gi);
 
-    if (!blocoMatch) {
+    if (!matches || matches.length === 0) {
       return Response.json({
-        resultado: "⚠️ Gabarito não encontrado."
-      });
-    }
-
-    const bloco = blocoMatch[1];
-
-    // 🔥 EXTRAI Q2:C etc
-    const matches = bloco.match(/Q\s*\d+\s*:\s*[A-D]/gi);
-
-    if (!matches) {
-      return Response.json({
-        resultado: "⚠️ Não consegui extrair o gabarito."
+        resultado: "⚠️ Não consegui extrair as respostas."
       });
     }
 
