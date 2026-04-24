@@ -8,7 +8,7 @@ export async function POST(req) {
       return Response.json({ erro: "Imagem não enviada" });
     }
 
-    // 🔥 SEMPRE USA MODO PROFESSOR POR BAIXO
+    // 🧠 SEMPRE USA MODO PROFESSOR (MAIS PRECISO)
     const prompt = `
 Analise as perguntas da imagem.
 
@@ -73,31 +73,38 @@ Repita para todas as questões.
       });
     }
 
-    // 🧠 MODO PROFESSOR → retorna tudo
+    // 🧠 MODO PROFESSOR → retorna completo
     if (modo === "professor") {
       return Response.json({ resultado: respostaCompleta });
     }
 
-    // ⚡ MODO FAST → extrai só respostas finais
+    // ⚡ MODO FAST → extrai respostas finais (ROBUSTO)
     const respostas = [];
 
-// 🔥 pega TODAS as respostas finais (robusto)
-const matches = respostaCompleta.matchAll(/Resposta\s*final\s*:\s*([A-D])/gi);
+    const matches = respostaCompleta.matchAll(/Resposta\s*final\s*:\s*([A-D])/gi);
 
-let contador = 1;
+    let contador = 1;
 
-for (const m of matches) {
-  respostas.push(`${contador} - ${m[1].toUpperCase()}`);
-  contador++;
+    for (const m of matches) {
+      respostas.push(`${contador} - ${m[1].toUpperCase()}`);
+      contador++;
+    }
+
+    // 🔥 fallback se não encontrar nada
+    if (respostas.length === 0) {
+      return Response.json({
+        resultado: "⚠️ Não consegui extrair as respostas automaticamente."
+      });
+    }
+
+    return Response.json({
+      resultado: respostas.join("\n")
+    });
+
+  } catch (error) {
+    return Response.json({
+      erro: "Erro no servidor",
+      detalhe: error.message
+    });
+  }
 }
-
-// 🔥 fallback caso regex falhe
-if (respostas.length === 0) {
-  return Response.json({
-    resultado: "⚠️ Não consegui extrair as respostas automaticamente."
-  });
-}
-
-return Response.json({
-  resultado: respostas.join("\n")
-});
