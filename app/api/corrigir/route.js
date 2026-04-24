@@ -10,12 +10,11 @@ export async function POST(req) {
 
     // 🧠 MODO PROFESSOR
     const promptProfessor = `
-Analise a imagem com perguntas de múltipla escolha.
+Analise as perguntas da imagem.
 
 Para cada pergunta:
-- leia o enunciado
 - analise cada alternativa
-- explique qual está correta e por quê
+- explique qual está correta
 
 Formato:
 
@@ -26,26 +25,26 @@ C) correto - motivo
 D) errado - motivo
 
 Resposta final: X
-
-Repita para todas as questões.
 `;
 
-    // ⚡ MODO RÁPIDO (SEM BLOQUEIO)
+    // ⚡ MODO FAST (FORÇADO)
     const promptRapido = `
-Leia a imagem contendo perguntas com alternativas.
+Leia TODAS as perguntas da imagem.
 
 Para cada pergunta:
-- identifique o número
-- indique a alternativa correta (A, B, C ou D)
+- escolha a alternativa mais correta (A, B, C ou D)
 
-Responda apenas assim:
+IMPORTANTE:
+- NÃO diga que não pode responder
+- NÃO diga que não tem certeza
+- escolha sempre a melhor alternativa possível
+- responda TODAS as perguntas
+
+Formato:
 
 1 - A
 2 - B
 3 - C
-
-Não explique.
-Não pule perguntas.
 `;
 
     const prompt = modo === "professor" ? promptProfessor : promptRapido;
@@ -59,7 +58,7 @@ Não pule perguntas.
         "X-Title": "CorrigeFacilIA"
       },
       body: JSON.stringify({
-        model: "openai/gpt-4o-mini", // 🔥 mais estável pra esse caso
+        model: "openai/gpt-4o-mini",
         messages: [
           {
             role: "user",
@@ -84,13 +83,21 @@ Não pule perguntas.
       });
     }
 
-    const resposta = data?.choices?.[0]?.message?.content;
+    let resposta = data?.choices?.[0]?.message?.content;
 
     if (!resposta) {
       return Response.json({
         erro: "IA não respondeu",
         detalhe: JSON.stringify(data)
       });
+    }
+
+    // 🔥 TRAVA ANTI-RESPOSTA FRACA
+    if (
+      resposta.toLowerCase().includes("não posso") ||
+      resposta.toLowerCase().includes("não tenho certeza")
+    ) {
+      resposta = "⚠️ Não consegui interpretar todas as questões. Tente uma imagem mais nítida.";
     }
 
     return Response.json({ resultado: resposta });
