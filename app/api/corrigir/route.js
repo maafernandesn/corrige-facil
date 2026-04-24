@@ -15,11 +15,7 @@ Analise as perguntas da imagem.
 Para cada pergunta:
 - analise as alternativas
 - explique qual está correta
-
-Sempre indique claramente a alternativa correta no formato:
-Q2:C
-Q3:D
-Q4:D
+- deixe claro qual alternativa é a correta
 `;
 
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -49,37 +45,33 @@ Q4:D
       return Response.json({ erro: "IA não respondeu" });
     }
 
-    // 🧠 MODO PROFESSOR
+    // 🧠 PROFESSOR
     if (modo === "professor") {
       return Response.json({ resultado: resposta });
     }
 
-    // 🔥 LIMPEZA FORTE
+    // 🔥 LIMPEZA
     resposta = resposta
       .replace(/\u00A0/g, " ")
       .replace(/\r/g, "")
       .replace(/\t/g, "")
       .replace(/\*\*/g, "")
-      .replace(/ +/g, " ")
       .trim();
 
-    // 🔥 EXTRAÇÃO DIRETA (CHAVE DO SUCESSO)
-    const matches = resposta.match(/Q\s*\d+\s*:\s*[A-D]/gi);
+    // 🔥 EXTRAÇÃO INTELIGENTE
+    const matches = [
+      ...resposta.matchAll(/([A-D])\)\s.*?correta/gi)
+    ];
 
-    if (!matches || matches.length === 0) {
+    if (matches.length === 0) {
       return Response.json({
-        resultado: "⚠️ Não consegui extrair as respostas."
+        resultado: "⚠️ Não consegui identificar as respostas."
       });
     }
 
     const corretas = {};
-
-    matches.forEach(item => {
-      const clean = item.replace(/\s+/g, "");
-      const [q, letra] = clean.split(":");
-      const numero = q.replace("Q", "");
-
-      corretas[numero] = letra;
+    matches.forEach((m, i) => {
+      corretas[i + 1] = m[1].toUpperCase();
     });
 
     // 🔥 RESPOSTAS DO ALUNO
@@ -91,7 +83,7 @@ Q4:D
 
     let resultado = "";
     let acertos = 0;
-    let total = Object.keys(corretas).length;
+    let total = matches.length;
 
     Object.keys(corretas).forEach(q => {
       const correta = corretas[q];
