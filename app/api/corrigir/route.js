@@ -13,21 +13,10 @@ export async function POST(req) {
 Analise as perguntas da imagem.
 
 Para cada pergunta:
-1. Leia o enunciado
-2. Analise cada alternativa
-3. Explique qual está correta
+- analise as alternativas
+- identifique a correta
 
-Formato:
-
-Questão 1:
-A) errado - motivo
-B) errado - motivo
-C) correto - motivo
-D) errado - motivo
-
-Resposta final: X
-
-No FINAL da resposta, escreva:
+Depois escreva EXATAMENTE no final:
 
 RESUMO:
 2:C
@@ -56,50 +45,32 @@ RESUMO:
     });
 
     const data = await res.json();
-
-    if (data.error) {
-      return Response.json({
-        erro: "Erro da API",
-        detalhe: data.error.message || JSON.stringify(data.error)
-      });
-    }
-
     let respostaCompleta = data?.choices?.[0]?.message?.content;
 
     if (!respostaCompleta) {
-      return Response.json({
-        erro: "IA não respondeu",
-        detalhe: JSON.stringify(data)
-      });
+      return Response.json({ erro: "IA não respondeu" });
     }
 
-    // 🔥 LIMPA MARKDOWN
-    respostaCompleta = respostaCompleta.replace(/\*\*/g, "").trim();
-
-    // 🧠 MODO PROFESSOR
+    // 🧠 modo professor
     if (modo === "professor") {
       return Response.json({ resultado: respostaCompleta });
     }
 
-    // 🔥 EXTRAI APENAS LINHAS DO TIPO "2:C"
-    const linhasValidas = respostaCompleta.match(/\d+\s*:\s*[A-D]/gi);
+    // 🔥 pega apenas "2:C", "3:D" etc
+    const matches = [...respostaCompleta.matchAll(/(\d+)\s*:\s*([A-D])/gi)];
 
-    if (!linhasValidas || linhasValidas.length === 0) {
+    if (matches.length === 0) {
       return Response.json({
         resultado: "⚠️ Não consegui extrair o resumo."
       });
     }
 
     const corretas = {};
-
-    linhasValidas.forEach(linha => {
-      const match = linha.match(/(\d+)\s*:\s*([A-D])/i);
-      if (match) {
-        corretas[match[1]] = match[2].toUpperCase();
-      }
+    matches.forEach(m => {
+      corretas[m[1]] = m[2].toUpperCase();
     });
 
-    // 🔥 RESPOSTAS DO ALUNO
+    // 🔥 respostas do aluno
     const aluno = {};
     respostasAlunoStr.split(",").forEach(par => {
       const [q, r] = par.trim().split("-");
@@ -128,7 +99,6 @@ RESUMO:
     });
 
     const nota = ((acertos / total) * 10).toFixed(1);
-
     resultado += `\n🎯 Nota: ${nota} (${acertos}/${total})`;
 
     return Response.json({ resultado });
