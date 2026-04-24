@@ -8,13 +8,14 @@ export async function POST(req) {
       return Response.json({ erro: "Imagem não enviada" });
     }
 
-    // 🧠 MODO PROFESSOR
-    const promptProfessor = `
+    // 🔥 SEMPRE USA MODO PROFESSOR POR BAIXO
+    const prompt = `
 Analise as perguntas da imagem.
 
 Para cada pergunta:
-- analise cada alternativa
-- explique qual está correta
+1. Leia o enunciado
+2. Analise cada alternativa
+3. Explique qual está correta
 
 Formato:
 
@@ -25,29 +26,9 @@ C) correto - motivo
 D) errado - motivo
 
 Resposta final: X
+
+Repita para todas as questões.
 `;
-
-    // ⚡ MODO FAST (FORÇADO)
-    const promptRapido = `
-Leia TODAS as perguntas da imagem.
-
-Para cada pergunta:
-- escolha a alternativa mais correta (A, B, C ou D)
-
-IMPORTANTE:
-- NÃO diga que não pode responder
-- NÃO diga que não tem certeza
-- escolha sempre a melhor alternativa possível
-- responda TODAS as perguntas
-
-Formato:
-
-1 - A
-2 - B
-3 - C
-`;
-
-    const prompt = modo === "professor" ? promptProfessor : promptRapido;
 
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
@@ -83,24 +64,42 @@ Formato:
       });
     }
 
-    let resposta = data?.choices?.[0]?.message?.content;
+    const respostaCompleta = data?.choices?.[0]?.message?.content;
 
-    if (!resposta) {
+    if (!respostaCompleta) {
       return Response.json({
         erro: "IA não respondeu",
         detalhe: JSON.stringify(data)
       });
     }
 
-    // 🔥 TRAVA ANTI-RESPOSTA FRACA
-    if (
-      resposta.toLowerCase().includes("não posso") ||
-      resposta.toLowerCase().includes("não tenho certeza")
-    ) {
-      resposta = "⚠️ Não consegui interpretar todas as questões. Tente uma imagem mais nítida.";
+    // 🧠 MODO PROFESSOR → retorna tudo
+    if (modo === "professor") {
+      return Response.json({ resultado: respostaCompleta });
     }
 
-    return Response.json({ resultado: resposta });
+    // ⚡ MODO FAST → extrai só respostas finais
+    const respostas = [];
+
+    const regex = /Resposta final:\s*([A-D])/gi;
+    let match;
+
+    let contador = 1;
+
+    while ((match = regex.exec(respostaCompleta)) !== null) {
+      respostas.push(`${contador} - ${match[1]}`);
+      contador++;
+    }
+
+    if (respostas.length === 0) {
+      return Response.json({
+        resultado: "⚠️ Não consegui extrair as respostas."
+      });
+    }
+
+    return Response.json({
+      resultado: respostas.join("\n")
+    });
 
   } catch (error) {
     return Response.json({
