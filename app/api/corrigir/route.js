@@ -10,9 +10,9 @@ export async function POST(req) {
 
     // 🧠 MODO PROFESSOR (com explicação)
     const promptProfessor = `
-Analise a imagem de uma questão de múltipla escolha.
+Analise a imagem de uma ou mais questões de múltipla escolha.
 
-Siga os passos:
+Para cada questão:
 1. Leia o enunciado
 2. Analise cada alternativa
 3. Explique por que está certa ou errada
@@ -27,13 +27,30 @@ C) correto - motivo
 D) errado - motivo
 
 Resposta final: X
+
+Se houver mais questões, repita o mesmo padrão.
 `;
 
-    // ⚡ MODO RÁPIDO (resposta direta)
+    // ⚡ MODO RÁPIDO (AGORA MULTI QUESTÕES)
     const promptRapido = `
-Leia a questão da imagem e responda apenas:
+Analise a imagem de uma prova.
 
-Questão 1 - Resposta correta: X
+Pode haver UMA ou MAIS questões.
+
+Para cada questão:
+- identifique o número
+- identifique a alternativa correta (A, B, C ou D)
+
+IMPORTANTE:
+- NÃO ignore questões
+- NÃO responda apenas a primeira
+- NÃO explique nada
+
+Responda EXATAMENTE neste formato:
+
+1 - A
+2 - B
+3 - C
 `;
 
     const prompt = modo === "professor" ? promptProfessor : promptRapido;
