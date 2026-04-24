@@ -9,8 +9,8 @@ export async function POST(req) {
       return Response.json({ erro: "Imagem não enviada" });
     }
 
-    // 🧠 PROMPT BASE (RACIOCÍNIO FORTE)
-    const promptProfessor = `
+    // 🧠 SEMPRE usa modo professor
+    const prompt = `
 Analise as perguntas da imagem.
 
 Para cada pergunta:
@@ -28,26 +28,6 @@ D) errado - motivo
 
 Resposta final: X
 `;
-
-    // ⚡ PROMPT FAST (MESMO RACIOCÍNIO, SAÍDA CONTROLADA)
-    const promptFast = `
-Analise as perguntas da imagem com atenção.
-
-Para cada pergunta:
-- pense corretamente antes de responder
-- escolha a alternativa correta
-
-Responda APENAS neste formato:
-
-Q2:C
-Q3:D
-Q4:D
-
-Sem explicação.
-Sem texto extra.
-`;
-
-    const prompt = modo === "professor" ? promptProfessor : promptFast;
 
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
@@ -74,43 +54,43 @@ Sem texto extra.
     if (data.error) {
       return Response.json({
         erro: "Erro da API",
-        detalhe: data.error.message
+        detalhe: data.error.message || JSON.stringify(data.error)
       });
     }
 
-    const resposta = data?.choices?.[0]?.message?.content;
+    const respostaCompleta = data?.choices?.[0]?.message?.content;
 
-    if (!resposta) {
+    if (!respostaCompleta) {
       return Response.json({
         erro: "IA não respondeu",
         detalhe: JSON.stringify(data)
       });
     }
 
-    // 🧠 MODO PROFESSOR
+    // 🧠 PROFESSOR
     if (modo === "professor") {
-      return Response.json({ resultado: resposta });
+      return Response.json({ resultado: respostaCompleta });
     }
 
-    // ⚡ FAST → parse seguro
-    const corretas = {};
+    // 🔥 LIMPA TEXTO (remove markdown)
+    const texto = respostaCompleta.replace(/\*\*/g, "");
 
-    const linhas = resposta.split("\n");
+    // 🔥 PEGA TODAS AS RESPOSTAS NA ORDEM
+    const matches = [...texto.matchAll(/Resposta\s*final\s*:\s*([A-D])/gi)];
 
-    linhas.forEach(linha => {
-      const match = linha.match(/Q(\d+)\s*:\s*([A-D])/i);
-      if (match) {
-        corretas[match[1]] = match[2].toUpperCase();
-      }
-    });
-
-    if (Object.keys(corretas).length === 0) {
+    if (matches.length === 0) {
       return Response.json({
-        resultado: "⚠️ Não consegui interpretar as respostas."
+        resultado: "⚠️ Não consegui extrair as respostas."
       });
     }
 
-    // 🔥 respostas do aluno
+    // 🔥 MONTA LISTA ORDENADA
+    const corretas = {};
+    matches.forEach((m, i) => {
+      corretas[i + 1] = m[1].toUpperCase();
+    });
+
+    // 🔥 PARSE RESPOSTAS DO ALUNO
     const aluno = {};
     respostasAlunoStr.split(",").forEach(par => {
       const [q, r] = par.trim().split("-");
@@ -119,7 +99,7 @@ Sem texto extra.
 
     let resultado = "";
     let acertos = 0;
-    let total = Object.keys(corretas).length;
+    let total = matches.length;
 
     Object.keys(corretas).forEach(q => {
       const correta = corretas[q];
