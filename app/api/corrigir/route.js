@@ -51,7 +51,7 @@ Q4:D
       return Response.json({ erro: "IA não respondeu" });
     }
 
-    // 🧠 modo professor
+    // 🧠 MODO PROFESSOR
     if (modo === "professor") {
       return Response.json({ resultado: resposta });
     }
@@ -64,32 +64,37 @@ Q4:D
       .replace(/\*\*/g, "")
       .trim();
 
-    // 🔥 QUEBRA EM LINHAS (FUNCIONA MELHOR QUE matchAll)
-    const linhas = resposta.split("\n");
+    // 🔥 PEGA TUDO APÓS "GABARITO"
+    const partes = resposta.split("GABARITO:");
 
-    const corretas = {};
+    if (partes.length < 2) {
+      return Response.json({
+        resultado: "⚠️ Gabarito não encontrado."
+      });
+    }
 
-    linhas.forEach(linha => {
-      const limpa = linha.replace(/\s/g, "").toUpperCase(); // remove tudo invisível
+    const bloco = partes[1];
 
-      if (limpa.startsWith("Q") && limpa.includes(":")) {
-        const partes = limpa.split(":"); // Q2:C
-        const numero = partes[0].replace("Q", "");
-        const letra = partes[1];
+    // 🔥 EXTRAI Q2:C etc
+    const matches = bloco.match(/Q\s*\d+\s*:\s*[A-D]/gi);
 
-        if (numero && letra && ["A","B","C","D"].includes(letra)) {
-          corretas[numero] = letra;
-        }
-      }
-    });
-
-    if (Object.keys(corretas).length === 0) {
+    if (!matches) {
       return Response.json({
         resultado: "⚠️ Não consegui extrair o gabarito."
       });
     }
 
-    // 🔥 respostas do aluno
+    const corretas = {};
+
+    matches.forEach(item => {
+      const clean = item.replace(/\s+/g, "");
+      const [q, letra] = clean.split(":");
+      const numero = q.replace("Q", "");
+
+      corretas[numero] = letra;
+    });
+
+    // 🔥 RESPOSTAS DO ALUNO
     const aluno = {};
     respostasAlunoStr.split(",").forEach(par => {
       const [q, r] = par.trim().split("-");
@@ -105,21 +110,21 @@ Q4:D
       const respAluno = aluno[q];
 
       if (!respAluno) {
-        resultado += q + " - ⚠️ Sem resposta\n";
+        resultado += `${q} - ⚠️ Sem resposta\n`;
         return;
       }
 
       if (respAluno === correta) {
-        resultado += q + " - " + correta + " ✅\n";
+        resultado += `${q} - ${correta} ✅\n`;
         acertos++;
       } else {
-        resultado += q + " - " + respAluno + " ❌ (correta: " + correta + ")\n";
+        resultado += `${q} - ${respAluno} ❌ (correta: ${correta})\n`;
       }
     });
 
     const nota = ((acertos / total) * 10).toFixed(1);
 
-    resultado += "\n🎯 Nota: " + nota + " (" + acertos + "/" + total + ")";
+    resultado += `\n🎯 Nota: ${nota} (${acertos}/${total})`;
 
     return Response.json({ resultado });
 
