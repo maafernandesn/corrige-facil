@@ -15,14 +15,6 @@ Analise as perguntas da imagem.
 Para cada pergunta:
 - analise as alternativas
 - explique qual está correta
-
-IMPORTANTE:
-No final da resposta, escreva EXATAMENTE:
-
-GABARITO:
-Q2:C
-Q3:D
-Q4:D
 `;
 
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -52,38 +44,30 @@ Q4:D
       return Response.json({ erro: "IA não respondeu" });
     }
 
-    // 🔥 LIMPEZA FORTE
-    resposta = resposta
-      .replace(/\u00A0/g, " ")     // espaço invisível
-      .replace(/\r/g, "")
-      .replace(/\t/g, "")
-      .replace(/\*\*/g, "")
-      .replace(/ +/g, " ")         // múltiplos espaços → 1
-      .trim();
-
     // 🧠 PROFESSOR
     if (modo === "professor") {
       return Response.json({ resultado: resposta });
     }
 
-    // 🔥 EXTRAÇÃO FLEXÍVEL (ESSA É A CHAVE)
-    const matches = resposta.match(/Q\s*\d+\s*:\s*[A-D]/gi);
+    // 🔥 LIMPEZA
+    resposta = resposta
+      .replace(/\u00A0/g, " ")
+      .replace(/\*\*/g, "")
+      .trim();
 
-    if (!matches || matches.length === 0) {
+    // 🔥 EXTRAÇÃO REAL (BASEADA NO COMPORTAMENTO DA IA)
+    const matches = [...resposta.matchAll(/Resposta correta:\s*([A-D])/gi)];
+
+    if (matches.length === 0) {
       return Response.json({
-        resultado: "⚠️ Não consegui extrair o gabarito."
+        resultado: "⚠️ Não consegui extrair as respostas."
       });
     }
 
+    // 🔥 organiza como 1,2,3
     const corretas = {};
-
-    matches.forEach(item => {
-      const clean = item.replace(/\s+/g, "");
-      const parts = clean.split(":"); // Q2:C
-      const numero = parts[0].replace("Q", "");
-      const letra = parts[1];
-
-      corretas[numero] = letra.toUpperCase();
+    matches.forEach((m, i) => {
+      corretas[i + 1] = m[1].toUpperCase();
     });
 
     // 🔥 respostas do aluno
@@ -95,7 +79,7 @@ Q4:D
 
     let resultado = "";
     let acertos = 0;
-    let total = Object.keys(corretas).length;
+    let total = matches.length;
 
     Object.keys(corretas).forEach(q => {
       const correta = corretas[q];
