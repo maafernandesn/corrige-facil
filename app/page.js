@@ -4,7 +4,6 @@ import { useState } from "react";
 
 export default function Home() {
   const [img, setImg] = useState(null);
-  const [gabarito, setGabarito] = useState("");
   const [resposta, setResposta] = useState("");
 
   const enviar = async () => {
@@ -16,7 +15,7 @@ export default function Home() {
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ img, gabarito })
+        body: JSON.stringify({ img })
       });
 
       const data = await r.json();
@@ -39,20 +38,6 @@ export default function Home() {
       <h1 style={{ textAlign: "center" }}>
         📸 CorrigeFácil IA
       </h1>
-
-      <textarea
-        placeholder="Gabarito (opcional) Ex: 1-A,2-C,3-D"
-        value={gabarito}
-        onChange={(e) => setGabarito(e.target.value)}
-        style={{
-          width: "100%",
-          height: 80,
-          marginBottom: 10,
-          padding: 10,
-          borderRadius: 6,
-          border: "1px solid #ccc"
-        }}
-      />
 
       <input
         type="file"
@@ -79,7 +64,8 @@ export default function Home() {
               const ctx = canvas.getContext("2d");
               ctx.drawImage(imgEl, 0, 0, canvas.width, canvas.height);
 
-              const compressed = canvas.toDataURL("image/jpeg", 1.0);
+              // 🔥 PNG (SEM PERDA DE QUALIDADE)
+              const compressed = canvas.toDataURL("image/png");
 
               setImg(compressed);
             };
@@ -104,7 +90,7 @@ export default function Home() {
           fontWeight: "bold"
         }}
       >
-        Corrigir Prova
+        Corrigir Questão
       </button>
 
       <div style={{
