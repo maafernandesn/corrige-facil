@@ -14,14 +14,17 @@ Analise as perguntas da imagem.
 
 Para cada pergunta:
 - analise as alternativas
-- identifique a correta
+- explique qual está correta
 
-Depois escreva EXATAMENTE no final:
+IMPORTANTE:
+No final da resposta, escreva EXATAMENTE:
 
-RESUMO:
-2:C
-3:D
-4:D
+GABARITO:
+Q2:C
+Q3:D
+Q4:D
+
+Não mude esse formato.
 `;
 
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -45,30 +48,34 @@ RESUMO:
     });
 
     const data = await res.json();
-    let respostaCompleta = data?.choices?.[0]?.message?.content;
+    const resposta = data?.choices?.[0]?.message?.content;
 
-    if (!respostaCompleta) {
+    if (!resposta) {
       return Response.json({ erro: "IA não respondeu" });
     }
 
-    // 🧠 modo professor
+    // 🧠 PROFESSOR
     if (modo === "professor") {
-      return Response.json({ resultado: respostaCompleta });
+      return Response.json({ resultado: resposta });
     }
 
-    // 🔥 pega apenas "2:C", "3:D" etc
-    const matches = [...respostaCompleta.matchAll(/(\d+)\s*:\s*([A-D])/gi)];
-
-    if (matches.length === 0) {
-      return Response.json({
-        resultado: "⚠️ Não consegui extrair o resumo."
-      });
-    }
+    // 🔥 FAST → pega GABARITO
+    const linhas = resposta.split("\n");
 
     const corretas = {};
-    matches.forEach(m => {
-      corretas[m[1]] = m[2].toUpperCase();
+
+    linhas.forEach(l => {
+      const match = l.match(/Q(\d+):([A-D])/i);
+      if (match) {
+        corretas[match[1]] = match[2].toUpperCase();
+      }
     });
+
+    if (Object.keys(corretas).length === 0) {
+      return Response.json({
+        resultado: "⚠️ Não consegui extrair o gabarito."
+      });
+    }
 
     // 🔥 respostas do aluno
     const aluno = {};
@@ -99,6 +106,7 @@ RESUMO:
     });
 
     const nota = ((acertos / total) * 10).toFixed(1);
+
     resultado += `\n🎯 Nota: ${nota} (${acertos}/${total})`;
 
     return Response.json({ resultado });
