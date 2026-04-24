@@ -9,7 +9,7 @@ export async function POST(req) {
       return Response.json({ erro: "Imagem não enviada" });
     }
 
-    // 🔥 IA SEMPRE NO MODO PROFESSOR
+    // 🔥 SEMPRE modo professor
     const prompt = `
 Analise as perguntas da imagem.
 
@@ -18,7 +18,7 @@ Para cada pergunta:
 2. Analise cada alternativa
 3. Explique qual está correta
 
-Formato obrigatório:
+Formato:
 
 Questão 1:
 A) errado - motivo
@@ -74,13 +74,18 @@ Repita para todas as questões.
       return Response.json({ resultado: respostaCompleta });
     }
 
-    // 🔥 EXTRAI RESPOSTAS CORRETAS
+    // 🔥 LIMPA MARKDOWN (** etc)
+    const textoLimpo = respostaCompleta
+      .replace(/\*\*/g, "")
+      .replace(/\*/g, "");
+
+    // 🔥 EXTRAI RESPOSTAS CORRETAS (SUPER ROBUSTO)
     const corretas = {};
-    const regex = /Questão\s*(\d+)[\s\S]*?Resposta\s*final\s*:\s*([A-D])/gi;
+    const regex = /Quest[aã]o\s*(\d+)[\s\S]*?Resposta\s*final\s*:\s*([A-D])/gi;
 
     let match;
 
-    while ((match = regex.exec(respostaCompleta)) !== null) {
+    while ((match = regex.exec(textoLimpo)) !== null) {
       corretas[match[1]] = match[2].toUpperCase();
     }
 
