@@ -8,7 +8,7 @@ export async function POST(req) {
       return Response.json({ erro: "Imagem não enviada" });
     }
 
-    // 🧠 SEMPRE USA MODO PROFESSOR (MAIS PRECISO)
+    // 🧠 SEMPRE usa raciocínio completo (modo professor)
     const prompt = `
 Analise as perguntas da imagem.
 
@@ -17,7 +17,7 @@ Para cada pergunta:
 2. Analise cada alternativa
 3. Explique qual está correta
 
-Formato:
+Formato obrigatório:
 
 Questão 1:
 A) errado - motivo
@@ -78,22 +78,36 @@ Repita para todas as questões.
       return Response.json({ resultado: respostaCompleta });
     }
 
-    // ⚡ MODO FAST → extrai respostas finais (ROBUSTO)
+    // ⚡ MODO FAST → extrai do professor (100% consistente)
     const respostas = [];
 
-    const matches = respostaCompleta.matchAll(/Resposta\s*final\s*:\s*([A-D])/gi);
+    // 🔥 captura "Questão X ... Resposta final: Y"
+    const regex = /Questão\s*(\d+)[\s\S]*?Resposta\s*final\s*:\s*([A-D])/gi;
 
-    let contador = 1;
+    let match;
 
-    for (const m of matches) {
-      respostas.push(`${contador} - ${m[1].toUpperCase()}`);
-      contador++;
+    while ((match = regex.exec(respostaCompleta)) !== null) {
+      const numero = match[1];
+      const alternativa = match[2].toUpperCase();
+
+      respostas.push(`${numero} - ${alternativa}`);
     }
 
-    // 🔥 fallback se não encontrar nada
+    // 🔥 fallback se não encontrar padrão com número
+    if (respostas.length === 0) {
+      const simples = respostaCompleta.matchAll(/Resposta\s*final\s*:\s*([A-D])/gi);
+
+      let contador = 1;
+
+      for (const m of simples) {
+        respostas.push(`${contador} - ${m[1].toUpperCase()}`);
+        contador++;
+      }
+    }
+
     if (respostas.length === 0) {
       return Response.json({
-        resultado: "⚠️ Não consegui extrair as respostas automaticamente."
+        resultado: "⚠️ Não consegui extrair as respostas."
       });
     }
 
