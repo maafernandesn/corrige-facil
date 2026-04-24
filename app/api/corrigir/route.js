@@ -30,7 +30,7 @@ Não mude esse formato.
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": \`Bearer \${process.env.OPENROUTER_API_KEY}\`,
+        "Authorization": "Bearer " + process.env.OPENROUTER_API_KEY,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
@@ -54,12 +54,12 @@ Não mude esse formato.
       return Response.json({ erro: "IA não respondeu" });
     }
 
-    // 🧠 PROFESSOR
+    // 🧠 MODO PROFESSOR
     if (modo === "professor") {
       return Response.json({ resultado: resposta });
     }
 
-    // 🔥 EXTRAÇÃO ULTRA ROBUSTA (SEM split)
+    // 🔥 EXTRAÇÃO ROBUSTA
     const matches = [...resposta.matchAll(/Q(\d+)\s*:\s*([A-D])/gi)];
 
     if (matches.length === 0) {
@@ -69,7 +69,6 @@ Não mude esse formato.
     }
 
     const corretas = {};
-
     matches.forEach(m => {
       corretas[m[1]] = m[2].toUpperCase();
     });
@@ -90,21 +89,21 @@ Não mude esse formato.
       const respAluno = aluno[q];
 
       if (!respAluno) {
-        resultado += `${q} - ⚠️ Sem resposta\n`;
+        resultado += q + " - ⚠️ Sem resposta\n";
         return;
       }
 
       if (respAluno === correta) {
-        resultado += `${q} - ${correta} ✅\n`;
+        resultado += q + " - " + correta + " ✅\n";
         acertos++;
       } else {
-        resultado += `${q} - ${respAluno} ❌ (correta: ${correta})\n`;
+        resultado += q + " - " + respAluno + " ❌ (correta: " + correta + ")\n";
       }
     });
 
     const nota = ((acertos / total) * 10).toFixed(1);
 
-    resultado += `\n🎯 Nota: ${nota} (${acertos}/${total})`;
+    resultado += "\n🎯 Nota: " + nota + " (" + acertos + "/" + total + ")";
 
     return Response.json({ resultado });
 
