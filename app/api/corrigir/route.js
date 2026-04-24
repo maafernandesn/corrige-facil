@@ -15,6 +15,13 @@ Analise as perguntas da imagem.
 Para cada pergunta:
 - analise as alternativas
 - explique qual está correta
+
+No final escreva:
+
+GABARITO:
+Q2:C
+Q3:D
+Q4:D
 `;
 
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -44,31 +51,43 @@ Para cada pergunta:
       return Response.json({ erro: "IA não respondeu" });
     }
 
-    // 🧠 PROFESSOR
+    // 🧠 modo professor
     if (modo === "professor") {
       return Response.json({ resultado: resposta });
     }
 
-    // 🔥 LIMPEZA
+    // 🔥 NORMALIZA TEXTO
     resposta = resposta
       .replace(/\u00A0/g, " ")
+      .replace(/\r/g, "")
+      .replace(/\t/g, "")
       .replace(/\*\*/g, "")
       .trim();
 
-    // 🔥 EXTRAÇÃO REAL (BASEADA NO COMPORTAMENTO DA IA)
-    const matches = [...resposta.matchAll(/Resposta correta:\s*([A-D])/gi)];
+    // 🔥 QUEBRA EM LINHAS (FUNCIONA MELHOR QUE matchAll)
+    const linhas = resposta.split("\n");
 
-    if (matches.length === 0) {
+    const corretas = {};
+
+    linhas.forEach(linha => {
+      const limpa = linha.replace(/\s/g, "").toUpperCase(); // remove tudo invisível
+
+      if (limpa.startsWith("Q") && limpa.includes(":")) {
+        const partes = limpa.split(":"); // Q2:C
+        const numero = partes[0].replace("Q", "");
+        const letra = partes[1];
+
+        if (numero && letra && ["A","B","C","D"].includes(letra)) {
+          corretas[numero] = letra;
+        }
+      }
+    });
+
+    if (Object.keys(corretas).length === 0) {
       return Response.json({
-        resultado: "⚠️ Não consegui extrair as respostas."
+        resultado: "⚠️ Não consegui extrair o gabarito."
       });
     }
-
-    // 🔥 organiza como 1,2,3
-    const corretas = {};
-    matches.forEach((m, i) => {
-      corretas[i + 1] = m[1].toUpperCase();
-    });
 
     // 🔥 respostas do aluno
     const aluno = {};
@@ -79,28 +98,28 @@ Para cada pergunta:
 
     let resultado = "";
     let acertos = 0;
-    let total = matches.length;
+    let total = Object.keys(corretas).length;
 
     Object.keys(corretas).forEach(q => {
       const correta = corretas[q];
       const respAluno = aluno[q];
 
       if (!respAluno) {
-        resultado += `${q} - ⚠️ Sem resposta\n`;
+        resultado += q + " - ⚠️ Sem resposta\n";
         return;
       }
 
       if (respAluno === correta) {
-        resultado += `${q} - ${correta} ✅\n`;
+        resultado += q + " - " + correta + " ✅\n";
         acertos++;
       } else {
-        resultado += `${q} - ${respAluno} ❌ (correta: ${correta})\n`;
+        resultado += q + " - " + respAluno + " ❌ (correta: " + correta + ")\n";
       }
     });
 
     const nota = ((acertos / total) * 10).toFixed(1);
 
-    resultado += `\n🎯 Nota: ${nota} (${acertos}/${total})`;
+    resultado += "\n🎯 Nota: " + nota + " (" + acertos + "/" + total + ")";
 
     return Response.json({ resultado });
 
