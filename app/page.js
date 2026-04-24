@@ -4,6 +4,7 @@ import { useState } from "react";
 
 export default function Home() {
   const [img, setImg] = useState(null);
+  const [modo, setModo] = useState("professor");
   const [resposta, setResposta] = useState("");
 
   const enviar = async () => {
@@ -15,7 +16,7 @@ export default function Home() {
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ img })
+        body: JSON.stringify({ img, modo })
       });
 
       const data = await r.json();
@@ -38,6 +39,21 @@ export default function Home() {
       <h1 style={{ textAlign: "center" }}>
         📸 CorrigeFácil IA
       </h1>
+
+      {/* 🔥 SELETOR DE MODO */}
+      <select
+        value={modo}
+        onChange={(e) => setModo(e.target.value)}
+        style={{
+          width: "100%",
+          padding: 10,
+          marginBottom: 10,
+          borderRadius: 6
+        }}
+      >
+        <option value="professor">🧠 Modo Professor (com explicação)</option>
+        <option value="rapido">⚡ Correção Rápida</option>
+      </select>
 
       <input
         type="file"
@@ -64,7 +80,6 @@ export default function Home() {
               const ctx = canvas.getContext("2d");
               ctx.drawImage(imgEl, 0, 0, canvas.width, canvas.height);
 
-              // 🔥 PNG (SEM PERDA DE QUALIDADE)
               const compressed = canvas.toDataURL("image/png");
 
               setImg(compressed);
@@ -90,7 +105,7 @@ export default function Home() {
           fontWeight: "bold"
         }}
       >
-        Corrigir Questão
+        Corrigir
       </button>
 
       <div style={{
