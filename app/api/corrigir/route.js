@@ -1,28 +1,24 @@
 export async function POST(req) {
   try {
-    const { img } = await req.json();
+    const body = await req.json();
+    const img = body.img;
+    const modo = body.modo || "professor";
 
     if (!img) {
       return Response.json({ erro: "Imagem não enviada" });
     }
 
-    const prompt = `
+    // 🧠 MODO PROFESSOR (com explicação)
+    const promptProfessor = `
 Analise a imagem de uma questão de múltipla escolha.
 
-Siga EXATAMENTE estes passos:
-
+Siga os passos:
 1. Leia o enunciado
-2. Analise cada alternativa separadamente
-3. Explique se está correta ou errada
-4. Só depois escolha a resposta final
+2. Analise cada alternativa
+3. Explique por que está certa ou errada
+4. Escolha a correta
 
-IMPORTANTE:
-- NÃO chute
-- NÃO use padrão (ex: sempre C)
-- Analise cada alternativa com atenção
-- Baseie-se no conteúdo escolar correto
-
-Formato obrigatório:
+Formato:
 
 Questão 1:
 A) errado - motivo
@@ -32,6 +28,15 @@ D) errado - motivo
 
 Resposta final: X
 `;
+
+    // ⚡ MODO RÁPIDO (resposta direta)
+    const promptRapido = `
+Leia a questão da imagem e responda apenas:
+
+Questão 1 - Resposta correta: X
+`;
+
+    const prompt = modo === "professor" ? promptProfessor : promptRapido;
 
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
@@ -60,12 +65,20 @@ Resposta final: X
 
     const data = await res.json();
 
+    // 🔥 tratamento de erro da API
+    if (data.error) {
+      return Response.json({
+        erro: "Erro da API",
+        detalhe: data.error.message || JSON.stringify(data.error)
+      });
+    }
+
     const resposta = data?.choices?.[0]?.message?.content;
 
     if (!resposta) {
       return Response.json({
         erro: "IA não respondeu",
-        detalhe: data
+        detalhe: JSON.stringify(data)
       });
     }
 
