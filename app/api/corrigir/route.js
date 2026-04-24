@@ -8,15 +8,14 @@ export async function POST(req) {
       return Response.json({ erro: "Imagem não enviada" });
     }
 
-    // 🧠 MODO PROFESSOR (com explicação)
+    // 🧠 MODO PROFESSOR
     const promptProfessor = `
-Analise a imagem de uma ou mais questões de múltipla escolha.
+Analise a imagem com perguntas de múltipla escolha.
 
-Para cada questão:
-1. Leia o enunciado
-2. Analise cada alternativa
-3. Explique por que está certa ou errada
-4. Escolha a correta
+Para cada pergunta:
+- leia o enunciado
+- analise cada alternativa
+- explique qual está correta e por quê
 
 Formato:
 
@@ -28,29 +27,25 @@ D) errado - motivo
 
 Resposta final: X
 
-Se houver mais questões, repita o mesmo padrão.
+Repita para todas as questões.
 `;
 
-    // ⚡ MODO RÁPIDO (AGORA MULTI QUESTÕES)
+    // ⚡ MODO RÁPIDO (SEM BLOQUEIO)
     const promptRapido = `
-Analise a imagem de uma prova.
+Leia a imagem contendo perguntas com alternativas.
 
-Pode haver UMA ou MAIS questões.
-
-Para cada questão:
+Para cada pergunta:
 - identifique o número
-- identifique a alternativa correta (A, B, C ou D)
+- indique a alternativa correta (A, B, C ou D)
 
-IMPORTANTE:
-- NÃO ignore questões
-- NÃO responda apenas a primeira
-- NÃO explique nada
-
-Responda EXATAMENTE neste formato:
+Responda apenas assim:
 
 1 - A
 2 - B
 3 - C
+
+Não explique.
+Não pule perguntas.
 `;
 
     const prompt = modo === "professor" ? promptProfessor : promptRapido;
@@ -64,7 +59,7 @@ Responda EXATAMENTE neste formato:
         "X-Title": "CorrigeFacilIA"
       },
       body: JSON.stringify({
-        model: "openai/gpt-4o",
+        model: "openai/gpt-4o-mini", // 🔥 mais estável pra esse caso
         messages: [
           {
             role: "user",
@@ -82,7 +77,6 @@ Responda EXATAMENTE neste formato:
 
     const data = await res.json();
 
-    // 🔥 tratamento de erro da API
     if (data.error) {
       return Response.json({
         erro: "Erro da API",
