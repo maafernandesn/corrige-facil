@@ -1,73 +1,25 @@
-export async function POST(req) {
-  try {
-    const { img } = await req.json();
+const prompt = `
+Analise a imagem de uma questão de múltipla escolha.
 
-    if (!img) {
-      return Response.json({ erro: "Imagem não enviada" });
-    }
+Para cada questão:
 
-    const prompt = `
-Analise a imagem de uma prova escolar.
-
-TAREFA:
-- Leia cada questão
-- Entenda o enunciado
-- Identifique a alternativa correta (A, B, C ou D)
+1. Leia o enunciado
+2. Analise cada alternativa separadamente
+3. Compare com a regra pedida
+4. Escolha a alternativa correta
 
 IMPORTANTE:
-- NÃO chute padrão (ex: tudo C)
-- Use seu conhecimento
-- Responda apenas o que tem certeza
+- NÃO chute
+- NÃO use padrão
+- Analise cada alternativa explicitamente
 
-Formato da resposta:
+Formato obrigatório:
 
-1 - A
-2 - C
-3 - D
+Questão 1:
+A) errado - motivo
+B) errado - motivo
+C) correto - motivo
+D) errado - motivo
+
+Resposta final: C
 `;
-
-    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://seu-app.vercel.app",
-        "X-Title": "CorrigeFacilIA"
-      },
-      body: JSON.stringify({
-        model: "openai/gpt-4o",
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: prompt },
-              {
-                type: "image_url",
-                image_url: { url: img }
-              }
-            ]
-          }
-        ]
-      })
-    });
-
-    const data = await res.json();
-
-    const resposta = data?.choices?.[0]?.message?.content;
-
-    if (!resposta) {
-      return Response.json({
-        erro: "IA não respondeu",
-        detalhe: data
-      });
-    }
-
-    return Response.json({ resultado: resposta });
-
-  } catch (error) {
-    return Response.json({
-      erro: "Erro no servidor",
-      detalhe: error.message
-    });
-  }
-}
