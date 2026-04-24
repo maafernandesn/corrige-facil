@@ -30,7 +30,7 @@ Não mude esse formato.
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        "Authorization": \`Bearer \${process.env.OPENROUTER_API_KEY}\`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
@@ -59,23 +59,20 @@ Não mude esse formato.
       return Response.json({ resultado: resposta });
     }
 
-    // 🔥 FAST → pega GABARITO
-    const linhas = resposta.split("\n");
+    // 🔥 EXTRAÇÃO ULTRA ROBUSTA (SEM split)
+    const matches = [...resposta.matchAll(/Q(\d+)\s*:\s*([A-D])/gi)];
 
-    const corretas = {};
-
-    linhas.forEach(l => {
-      const match = l.match(/Q(\d+):([A-D])/i);
-      if (match) {
-        corretas[match[1]] = match[2].toUpperCase();
-      }
-    });
-
-    if (Object.keys(corretas).length === 0) {
+    if (matches.length === 0) {
       return Response.json({
         resultado: "⚠️ Não consegui extrair o gabarito."
       });
     }
+
+    const corretas = {};
+
+    matches.forEach(m => {
+      corretas[m[1]] = m[2].toUpperCase();
+    });
 
     // 🔥 respostas do aluno
     const aluno = {};
