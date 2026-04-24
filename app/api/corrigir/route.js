@@ -16,9 +16,9 @@ Para cada pergunta:
 - analise as alternativas
 - explique qual está correta
 
-No final da resposta escreva EXATAMENTE:
+No final escreva um gabarito assim:
 
-**** GABARITO ****
+GABARITO:
 Q2:C
 Q3:D
 Q4:D
@@ -51,12 +51,12 @@ Q4:D
       return Response.json({ erro: "IA não respondeu" });
     }
 
-    // 🧠 modo professor
+    // 🧠 PROFESSOR
     if (modo === "professor") {
       return Response.json({ resultado: resposta });
     }
 
-    // 🔥 NORMALIZA TEXTO
+    // 🔥 NORMALIZA
     resposta = resposta
       .replace(/\u00A0/g, " ")
       .replace(/\r/g, "")
@@ -64,18 +64,19 @@ Q4:D
       .replace(/\*\*/g, "")
       .trim();
 
-    // 🔥 LOCALIZA MARCADOR ÚNICO
-    const partes = resposta.split("**** GABARITO ****");
+    // 🔥 PROCURA GABARITO FLEXÍVEL
+    const regexBloco = /GABARITO[\s\S]*?(Q\s*\d+\s*:\s*[A-D][\s\S]*)/i;
+    const blocoMatch = resposta.match(regexBloco);
 
-    if (partes.length < 2) {
+    if (!blocoMatch) {
       return Response.json({
         resultado: "⚠️ Gabarito não encontrado."
       });
     }
 
-    const bloco = partes[1];
+    const bloco = blocoMatch[1];
 
-    // 🔥 EXTRAÇÃO SUPER SEGURA
+    // 🔥 EXTRAI Q2:C etc
     const matches = bloco.match(/Q\s*\d+\s*:\s*[A-D]/gi);
 
     if (!matches) {
