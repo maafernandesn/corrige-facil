@@ -3,12 +3,13 @@ export async function POST(req) {
     const body = await req.json();
     const img = body.img;
     const modo = body.modo || "professor";
+    const respostasAlunoStr = body.respostasAluno || "";
 
     if (!img) {
       return Response.json({ erro: "Imagem não enviada" });
     }
 
-    // 🧠 SEMPRE usa raciocínio completo (modo professor)
+    // 🔥 IA SEMPRE NO MODO PROFESSOR
     const prompt = `
 Analise as perguntas da imagem.
 
@@ -34,9 +35,7 @@ Repita para todas as questões.
       method: "POST",
       headers: {
         "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://seu-app.vercel.app",
-        "X-Title": "CorrigeFacilIA"
+        "Content-Type": "application/json"
       },
       body: JSON.stringify({
         model: "openai/gpt-4o-mini",
@@ -45,10 +44,7 @@ Repita para todas as questões.
             role: "user",
             content: [
               { type: "text", text: prompt },
-              {
-                type: "image_url",
-                image_url: { url: img }
-              }
+              { type: "image_url", image_url: { url: img } }
             ]
           }
         ]
@@ -73,47 +69,54 @@ Repita para todas as questões.
       });
     }
 
-    // 🧠 MODO PROFESSOR → retorna completo
+    // 🧠 MODO PROFESSOR
     if (modo === "professor") {
       return Response.json({ resultado: respostaCompleta });
     }
 
-    // ⚡ MODO FAST → extrai do professor (100% consistente)
-    const respostas = [];
-
-    // 🔥 captura "Questão X ... Resposta final: Y"
+    // 🔥 EXTRAI RESPOSTAS CORRETAS
+    const corretas = {};
     const regex = /Questão\s*(\d+)[\s\S]*?Resposta\s*final\s*:\s*([A-D])/gi;
 
     let match;
 
     while ((match = regex.exec(respostaCompleta)) !== null) {
-      const numero = match[1];
-      const alternativa = match[2].toUpperCase();
-
-      respostas.push(`${numero} - ${alternativa}`);
+      corretas[match[1]] = match[2].toUpperCase();
     }
 
-    // 🔥 fallback se não encontrar padrão com número
-    if (respostas.length === 0) {
-      const simples = respostaCompleta.matchAll(/Resposta\s*final\s*:\s*([A-D])/gi);
-
-      let contador = 1;
-
-      for (const m of simples) {
-        respostas.push(`${contador} - ${m[1].toUpperCase()}`);
-        contador++;
-      }
-    }
-
-    if (respostas.length === 0) {
-      return Response.json({
-        resultado: "⚠️ Não consegui extrair as respostas."
-      });
-    }
-
-    return Response.json({
-      resultado: respostas.join("\n")
+    // 🔥 PARSE RESPOSTAS DO ALUNO
+    const aluno = {};
+    respostasAlunoStr.split(",").forEach(par => {
+      const [q, r] = par.trim().split("-");
+      if (q && r) aluno[q] = r.toUpperCase();
     });
+
+    let resultado = "";
+    let acertos = 0;
+    let total = Object.keys(corretas).length;
+
+    Object.keys(corretas).forEach(q => {
+      const correta = corretas[q];
+      const respAluno = aluno[q];
+
+      if (!respAluno) {
+        resultado += `${q} - ⚠️ Sem resposta\n`;
+        return;
+      }
+
+      if (respAluno === correta) {
+        resultado += `${q} - ${correta} ✅\n`;
+        acertos++;
+      } else {
+        resultado += `${q} - ${respAluno} ❌ (correta: ${correta})\n`;
+      }
+    });
+
+    const nota = total > 0 ? ((acertos / total) * 10).toFixed(1) : 0;
+
+    resultado += `\n🎯 Nota: ${nota} (${acertos}/${total})`;
+
+    return Response.json({ resultado });
 
   } catch (error) {
     return Response.json({
