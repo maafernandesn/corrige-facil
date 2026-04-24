@@ -9,7 +9,6 @@ export async function POST(req) {
       return Response.json({ erro: "Imagem não enviada" });
     }
 
-    // 🧠 SEMPRE usa modo professor
     const prompt = `
 Analise as perguntas da imagem.
 
@@ -27,6 +26,15 @@ C) correto - motivo
 D) errado - motivo
 
 Resposta final: X
+
+No FINAL da resposta, escreva:
+
+RESUMO:
+2:C
+3:D
+4:D
+
+(Sem explicação no resumo)
 `;
 
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -72,25 +80,33 @@ Resposta final: X
       return Response.json({ resultado: respostaCompleta });
     }
 
-    // 🔥 LIMPA TEXTO (remove markdown)
-    const texto = respostaCompleta.replace(/\*\*/g, "");
+    // 🔥 FAST → pega RESUMO
+    const resumoMatch = respostaCompleta.match(/RESUMO:\s*([\s\S]*)/i);
 
-    // 🔥 PEGA TODAS AS RESPOSTAS NA ORDEM
-    const matches = [...texto.matchAll(/Resposta\s*final\s*:\s*([A-D])/gi)];
-
-    if (matches.length === 0) {
+    if (!resumoMatch) {
       return Response.json({
-        resultado: "⚠️ Não consegui extrair as respostas."
+        resultado: "⚠️ Não consegui extrair o resumo."
       });
     }
 
-    // 🔥 MONTA LISTA ORDENADA
+    const linhas = resumoMatch[1].trim().split("\n");
+
     const corretas = {};
-    matches.forEach((m, i) => {
-      corretas[i + 1] = m[1].toUpperCase();
+
+    linhas.forEach(linha => {
+      const match = linha.match(/(\d+)\s*:\s*([A-D])/i);
+      if (match) {
+        corretas[match[1]] = match[2].toUpperCase();
+      }
     });
 
-    // 🔥 PARSE RESPOSTAS DO ALUNO
+    if (Object.keys(corretas).length === 0) {
+      return Response.json({
+        resultado: "⚠️ Resumo não identificado."
+      });
+    }
+
+    // 🔥 respostas do aluno
     const aluno = {};
     respostasAlunoStr.split(",").forEach(par => {
       const [q, r] = par.trim().split("-");
@@ -99,7 +115,7 @@ Resposta final: X
 
     let resultado = "";
     let acertos = 0;
-    let total = matches.length;
+    let total = Object.keys(corretas).length;
 
     Object.keys(corretas).forEach(q => {
       const correta = corretas[q];
