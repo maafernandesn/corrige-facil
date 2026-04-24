@@ -9,7 +9,7 @@ export async function POST(req) {
       return Response.json({ erro: "Imagem não enviada" });
     }
 
-    // 🔥 SEMPRE modo professor
+    // 🔥 IA SEMPRE NO MODO PROFESSOR
     const prompt = `
 Analise as perguntas da imagem.
 
@@ -74,20 +74,23 @@ Repita para todas as questões.
       return Response.json({ resultado: respostaCompleta });
     }
 
-    // 🔥 LIMPA MARKDOWN (** etc)
-    const textoLimpo = respostaCompleta
-      .replace(/\*\*/g, "")
-      .replace(/\*/g, "");
+    // 🔥 LIMPA TEXTO
+    const texto = respostaCompleta.replace(/\*\*/g, "");
 
-    // 🔥 EXTRAI RESPOSTAS CORRETAS (SUPER ROBUSTO)
-    const corretas = {};
-    const regex = /Quest[aã]o\s*(\d+)[\s\S]*?Resposta\s*final\s*:\s*([A-D])/gi;
+    // 🔥 PEGA TODAS AS RESPOSTAS FINAIS (SEMPRE FUNCIONA)
+    const matches = [...texto.matchAll(/Resposta\s*final\s*:\s*([A-D])/gi)];
 
-    let match;
-
-    while ((match = regex.exec(textoLimpo)) !== null) {
-      corretas[match[1]] = match[2].toUpperCase();
+    if (matches.length === 0) {
+      return Response.json({
+        resultado: "⚠️ Não consegui identificar as respostas."
+      });
     }
+
+    // 🔥 CONVERTE PARA LISTA ORDENADA
+    const corretas = {};
+    matches.forEach((m, i) => {
+      corretas[i + 1] = m[1].toUpperCase();
+    });
 
     // 🔥 PARSE RESPOSTAS DO ALUNO
     const aluno = {};
@@ -98,7 +101,7 @@ Repita para todas as questões.
 
     let resultado = "";
     let acertos = 0;
-    let total = Object.keys(corretas).length;
+    let total = matches.length;
 
     Object.keys(corretas).forEach(q => {
       const correta = corretas[q];
@@ -117,7 +120,7 @@ Repita para todas as questões.
       }
     });
 
-    const nota = total > 0 ? ((acertos / total) * 10).toFixed(1) : 0;
+    const nota = ((acertos / total) * 10).toFixed(1);
 
     resultado += `\n🎯 Nota: ${nota} (${acertos}/${total})`;
 
