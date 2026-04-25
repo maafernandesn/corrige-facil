@@ -11,11 +11,7 @@ export default function Home() {
 
   const enviar = async () => {
     try {
-      if (!img) {
-        alert("⚠️ Selecione uma imagem primeiro.");
-        return;
-      }
-
+      if (!img) return alert("⚠️ Selecione uma imagem.");
       setLoading(true);
       setResultado(null);
 
@@ -25,131 +21,102 @@ export default function Home() {
         body: JSON.stringify({
           img,
           modo,
-          // Agora enviamos o gabarito para Tutor e Fast para manter a consistência
           gabaritoOficial: (modo === "fast" || modo === "tutor") ? gabaritoOficial : null
         })
       });
 
       const data = await r.json();
-
       if (data.erro) {
         setResultado({ erro: data.erro });
       } else {
         setResultado(data);
-        if (modo === "professor" && data.resultado) {
-          setGabaritoOficial(data.resultado);
-        }
+        if (modo === "professor") setGabaritoOficial(data.resultado);
       }
     } catch (e) {
-      setResultado({ erro: "Erro na conexão com o servidor ❌" });
+      setResultado({ erro: "Erro de conexão ❌" });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div style={{ padding: 20, maxWidth: 700, margin: "0 auto", fontFamily: "system-ui, sans-serif" }}>
-      <header style={{ textAlign: "center", marginBottom: 30 }}>
-        <h1>📸 CorrigeFácil IA</h1>
-        <p style={{ color: "#666" }}>Correção sem divergências entre modos</p>
+    <div style={{ padding: 20, maxWidth: 800, margin: "0 auto", fontFamily: "sans-serif" }}>
+      <header style={{ textAlign: "center" }}>
+        <h1>🚀 CorrigeFácil IA 2.0</h1>
+        <p>Gerador de Gabarito e Corretor Visual</p>
       </header>
 
-      <main style={{ background: "#fff", padding: 25, borderRadius: 16, boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }}>
-        
-        <label style={{ fontWeight: "bold", display: "block", marginBottom: 8 }}>Ação:</label>
-        <select
-          value={modo}
+      <div style={{ background: "#fff", padding: 20, borderRadius: 12, boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}>
+        <select 
+          value={modo} 
           onChange={(e) => setModo(e.target.value)}
-          style={{ width: "100%", padding: 12, marginBottom: 20, borderRadius: 8, border: "1px solid #ddd" }}
+          style={{ width: "100%", padding: 12, marginBottom: 15, borderRadius: 8 }}
         >
-          <option value="professor">🧠 1. Gerar Gabarito (Mestre)</option>
-          <option value="fast">⚡ 2. Corrigir Prova Aluno (Fast)</option>
-          <option value="tutor">👨‍🏫 3. Explicar Erros (Tutor)</option>
+          <option value="professor">🧠 1. Criar Gabarito (Resolve a Prova)</option>
+          <option value="fast">⚡ 2. Corrigir Aluno (Detecta 'Em Branco')</option>
+          <option value="tutor">👨‍🏫 3. Explicar com Tutor</option>
         </select>
 
-        <div style={{ marginBottom: 20 }}>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => {
-              const file = e.target.files[0];
-              if (!file) return;
-              const reader = new FileReader();
-              reader.onload = (event) => {
-                const imgEl = new Image();
-                imgEl.src = event.target.result;
-                imgEl.onload = () => {
-                  const canvas = document.createElement("canvas");
-                  const maxWidth = 1024; // Aumentamos um pouco a resolução para detalhes fonéticos
-                  const scale = maxWidth / imgEl.width;
-                  canvas.width = maxWidth;
-                  canvas.height = imgEl.height * scale;
-                  const ctx = canvas.getContext("2d");
-                  ctx.drawImage(imgEl, 0, 0, canvas.width, canvas.height);
-                  setImg(canvas.toDataURL("image/jpeg", 0.9));
-                };
-              };
-              reader.readAsDataURL(file);
-            }}
-          />
-        </div>
+        <input type="file" accept="image/*" onChange={(e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            const imgEl = new Image();
+            imgEl.src = ev.target.result;
+            imgEl.onload = () => {
+              const canvas = document.createElement("canvas");
+              canvas.width = 1024;
+              const scale = 1024 / imgEl.width;
+              canvas.height = imgEl.height * scale;
+              canvas.getContext("2d").drawImage(imgEl, 0, 0, canvas.width, canvas.height);
+              setImg(canvas.toDataURL("image/jpeg", 0.9));
+            };
+          };
+          reader.readAsDataURL(file);
+        }} style={{ marginBottom: 15 }} />
 
-        <button
-          onClick={enviar}
+        <button 
+          onClick={enviar} 
           disabled={loading}
-          style={{
-            width: "100%", padding: 16, background: loading ? "#ccc" : "#0070f3",
-            color: "#fff", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 18, fontWeight: "bold"
-          }}
+          style={{ width: "100%", padding: 15, background: "#0070f3", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: "bold" }}
         >
-          {loading ? "Processando..." : "Analisar Agora"}
+          {loading ? "Processando..." : "Analisar Imagem"}
         </button>
 
         {resultado && (
-          <div style={{ marginTop: 30 }}>
-            {resultado.erro && <div style={{ color: "red" }}>{resultado.erro}</div>}
-
-            {modo === "professor" && resultado.resultado && (
-              <div>
-                <h3>✅ Gabarito de Referência Gerado:</h3>
-                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                  {Object.entries(resultado.resultado).map(([q, r]) => (
-                    <div key={q} style={{ padding: 10, background: "#eef", borderRadius: 5 }}>
-                      Q{q}: <strong>{r}</strong>
-                    </div>
-                  ))}
-                </div>
+          <div style={{ marginTop: 20 }}>
+            {resultado.nota && (
+              <div style={{ textAlign: "center", padding: 15, background: "#0070f3", color: "#fff", borderRadius: 8, marginBottom: 15 }}>
+                <h2 style={{ margin: 0 }}>Nota Final: {resultado.nota}</h2>
               </div>
             )}
 
-            {modo === "fast" && resultado.detalhes && (
-              <div>
-                <div style={{ padding: 20, background: "#0070f3", color: "#fff", borderRadius: 10, textAlign: "center" }}>
-                  <h2>Nota: {resultado.nota}</h2>
-                  <p>{resultado.acertos} acertos de {resultado.total}</p>
+            {resultado.detalhes ? (
+              resultado.detalhes.map((d, i) => (
+                <div key={i} style={{ padding: 10, borderBottom: "1px solid #eee", display: "flex", justifyContent: "space-between", background: d.aluno === "EM BRANCO" ? "#fff3cd" : "transparent" }}>
+                  <span>Q{d.q}</span>
+                  <span>
+                    {d.aluno === "EM BRANCO" ? (
+                      <strong style={{ color: "#856404" }}>⚠️ NÃO RESPONDIDA</strong>
+                    ) : (
+                      <>Aluno: <strong>{d.aluno}</strong> | {d.status ? "✅" : `❌ (Certa: ${d.correta})`}</>
+                    )}
+                  </span>
                 </div>
-                {resultado.detalhes.map((item, i) => (
-                  <div key={i} style={{ marginTop: 10, padding: 10, borderBottom: "1px solid #eee", display: "flex", justifyContent: "space-between" }}>
-                    <span>Questão {item.q}</span>
-                    <span>Aluno: {item.aluno} | {item.status ? "✅" : `❌ (Certo: ${item.correta})`}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {modo === "tutor" && resultado.resultado && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 15 }}>
-                {Object.entries(resultado.resultado).map(([q, info]) => (
-                  <div key={q} style={{ padding: 15, background: "#f9f9f9", borderRadius: 8, borderLeft: "4px solid #0070f3" }}>
-                    <strong>Questão {q} ({info.res}):</strong>
-                    <p style={{ margin: "5px 0 0", color: "#555" }}>📖 {info.exp}</p>
+              ))
+            ) : resultado.resultado && (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                {Object.entries(resultado.resultado).map(([q, v]) => (
+                  <div key={q} style={{ padding: 10, background: "#f0f4f8", borderRadius: 6 }}>
+                    <strong>Q{q}:</strong> {typeof v === 'string' ? v : `${v.res} - 📖 ${v.exp}`}
                   </div>
                 ))}
               </div>
             )}
           </div>
         )}
-      </main>
+      </div>
     </div>
   );
 }
