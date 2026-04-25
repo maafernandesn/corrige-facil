@@ -12,31 +12,34 @@ export async function POST(req) {
 
     if (modo === "professor") {
       promptSistema = `Você é um Professor especialista elaborando um gabarito oficial.
-      REGRA DE OURO: IGNORE COMPLETAMENTE qualquer marcação, risco, X ou letra gigante feita a caneta ou lápis pelo aluno. Resolva a questão do zero lendo o texto, a imagem e as alternativas com sua própria inteligência.
+      REGRA DE OURO: IGNORE COMPLETAMENTE qualquer marcação, risco, X ou letra gigante feita a caneta ou lápis pelo aluno. Resolva as questões do zero lendo o texto, a imagem e as alternativas com sua própria inteligência.
       
       PASSOS:
-      1. Identifique o NÚMERO REAL da questão impresso na prova (ex: 12, 03, etc).
-      2. Escolha a alternativa correta baseada apenas na lógica e no material de apoio da prova.
+      1. Varra a imagem inteira e identifique TODAS as questões presentes (ex: 01, 02, 03, 04...).
+      2. Escolha a alternativa correta para CADA UMA baseada apenas na lógica e no material de apoio da prova.
       
-      Responda APENAS um JSON no formato {"numero_da_questao": "Letra_Correta"}. 
-      Exemplo: {"12": "D"}`;
+      Responda APENAS um JSON contendo TODAS as questões encontradas. 
+      Exemplo: {"01": "C", "02": "C", "03": "D", "04": "D"}`;
     } 
     else if (modo === "fast") {
-      promptSistema = `Você é um corretor visual. Sua ÚNICA função é olhar a imagem e dizer o que o ALUNO marcou (seja com um X, um círculo, ou uma letra escrita por cima). Não tente resolver a questão.
+      promptSistema = `Você é um corretor visual. Sua ÚNICA função é olhar a imagem inteira e dizer o que o ALUNO marcou em TODAS as questões (seja com um X, um círculo, ou uma letra escrita por cima). Não tente resolver a questão.
       
-      Responda APENAS um JSON no formato {"numero_da_questao": "Letra_Marcada_Pelo_Aluno"}. 
-      Exemplo: {"12": "C"}`;
+      Varra a imagem inteira e responda APENAS um JSON com TODAS as questões encontradas. 
+      Exemplo: {"01": "C", "02": "A", "03": "D", "04": "B"}`;
     } 
     else if (modo === "tutor") {
-      promptSistema = `Aja como um Professor Tutor didático e encorajador. Sua missão é explicar o PORQUÊ da resposta estar correta.
+      promptSistema = `Aja como um Professor Tutor didático e encorajador. Sua missão é explicar o PORQUÊ da resposta estar correta para TODAS as questões da imagem.
       
       REGRAS:
-      1. Identifique o número real da questão (ex: 12).
+      1. Varra a imagem e identifique TODAS as questões.
       2. Diga qual é a alternativa correta VERDADEIRA e explique o motivo citando o texto, a imagem ou regras gramaticais/fonéticas.
       3. Nunca se baseie nas respostas escritas à mão pelo aluno para dar a explicação.
       
-      Responda APENAS um JSON. Exemplo: 
-      {"12": {"res": "D", "exp": "A expressão CHOMP CHOMP é uma onomatopeia que representa o som de mastigação."}}`;
+      Responda APENAS um JSON contendo TODAS as questões. Exemplo: 
+      {
+        "01": {"res": "C", "exp": "Explicação da questão 1..."},
+        "02": {"res": "A", "exp": "Explicação da questão 2..."}
+      }`;
     }
 
     const resIA = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -60,7 +63,6 @@ export async function POST(req) {
 
     // Lógica para calcular a nota e cruzar dados no Modo Fast
     if (modo === "fast") {
-      // Se não houver gabarito prévio, usa o que a IA acabou de ler (fallback)
       const gabaritoBase = gabaritoOficial || resultadoBruto;
       let acertos = 0;
       let total = 0;
@@ -71,7 +73,6 @@ export async function POST(req) {
         const correta = typeof gabaritoBase[q] === 'object' ? gabaritoBase[q].correta : gabaritoBase[q];
         const aluno = resultadoBruto[q] || "N/A";
         
-        // Compara ignorando maiúsculas/minúsculas
         const status = (String(correta).toUpperCase() === String(aluno).toUpperCase());
         if (status) acertos++;
         
