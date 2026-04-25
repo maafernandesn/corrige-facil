@@ -3,38 +3,37 @@ export async function POST(req) {
     const body = await req.json();
     const { img, modo = "professor", gabaritoOficial = null } = body;
 
-    if (!img) {
-      return Response.json({ erro: "A imagem é obrigatória." }, { status: 400 });
-    }
+    if (!img) return Response.json({ erro: "Imagem obrigatória" }, { status: 400 });
 
-    // 🎯 CONFIGURAÇÃO DE PROMPTS ESPECÍFICOS
+    // 🧠 PROMPTS REFORMULADOS PARA ALTA PRECISÃO
     let promptSistema = "";
     
     if (modo === "professor") {
-      promptSistema = `Você é um gerador de gabaritos. Analise a prova e identifique a alternativa correta de cada questão. 
-      Responda APENAS um JSON no formato: {"1": "A", "2": "C"}`;
+      promptSistema = `Aja como um professor de Língua Portuguesa rigoroso. 
+      Sua tarefa é gerar um gabarito INFALÍVEL.
+      PASSOS:
+      1. Leia o enunciado e as alternativas com atenção.
+      2. Se houver um texto, localize o trecho exato que responde à questão.
+      3. Se for fonética (sons de letras), compare os sons um por um antes de decidir.
+      4. Responda APENAS um JSON: {"1": "A", "2": "C"}`;
     } 
     
     else if (modo === "fast") {
-      // Se já temos o gabarito, a IA foca apenas em ler o que o aluno fez (mais precisão)
-      if (gabaritoOficial) {
-        promptSistema = `Você é um sensor óptico de correção. 
-        Sua tarefa é identificar qual alternativa o aluno MARCOU (com X, círculo ou rasura) na imagem. 
-        Ignore se a resposta está certa ou errada, apenas relate o que foi assinalado.
-        Responda APENAS um JSON no formato: {"1": "A", "2": "B"}`;
-      } else {
-        // Se não tem gabarito, ela faz o trabalho duplo (economiza tempo do professor)
-        promptSistema = `Você deve: 1. Resolver as questões da prova. 2. Identificar qual alternativa o aluno MARCOU na imagem.
-        Responda APENAS um JSON no formato: {"1": {"correta": "A", "aluno": "B"}, "2": {"correta": "C", "aluno": "C"}}`;
-      }
+      promptSistema = `Você é um fiscal de correção. 
+      Sua tarefa é olhar a imagem e identificar APENAS o que o aluno marcou (X, círculo ou rasura).
+      Não tente resolver a questão, apenas relate o que você VÊ na marcação do aluno.
+      Responda APENAS um JSON: {"1": "A", "2": "B"}`;
     } 
     
     else if (modo === "tutor") {
-      promptSistema = `Você é um tutor didático. Para cada questão na imagem, identifique a resposta correta e dê uma explicação curtíssima (máximo 2 frases) do porquê aquela é a resposta.
-      Responda APENAS um JSON no formato: {"1": {"res": "A", "exp": "..."}, "2": {"res": "B", "exp": "..."}}`;
+      promptSistema = `Você é um tutor pedagógico detalhista. 
+      Para cada questão:
+      1. Analise o texto de apoio para garantir a resposta correta.
+      2. No caso de fonética, explique o som das letras (ex: 'C' com som de /s/ ou /k/).
+      3. Seja claro e não invente informações. Se o texto diz 'peixes', não diga 'camarões'.
+      Responda APENAS um JSON: {"1": {"res": "A", "exp": "..."}, "2": {"res": "B", "exp": "..."}}`;
     }
 
-    // 🚀 CHAMADA OTIMIZADA PARA OPENROUTER
     const responseIA = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -42,7 +41,7 @@ export async function POST(req) {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "openai/gpt-4o-mini", // Alta performance com baixo custo
+        model: "openai/gpt-4o-mini", 
         messages: [
           {
             role: "user",
@@ -53,7 +52,7 @@ export async function POST(req) {
           }
         ],
         response_format: { type: "json_object" },
-        temperature: 0 // Precisão máxima, sem "criatividade"
+        temperature: 0 // Mantém a resposta fria e baseada em fatos
       })
     });
 
@@ -62,42 +61,31 @@ export async function POST(req) {
 
     const resultadoBruto = JSON.parse(data.choices[0].message.content);
 
-    // 📊 PÓS-PROCESSAMENTO PARA O MODO FAST (CÁLCULO DE NOTA)
+    // Lógica de cálculo de nota (Modo Fast)
     if (modo === "fast") {
       let acertos = 0;
       let total = 0;
       let detalhes = [];
+      const gabaritoFinal = gabaritoOficial || resultadoBruto;
 
-      // Se o gabarito veio de fora (professor já tinha salvo)
-      if (gabaritoOficial) {
-        Object.keys(gabaritoOficial).forEach(q => {
-          total++;
-          const correta = gabaritoOficial[q];
-          const aluno = resultadoBruto[q] || "N/A";
-          const status = correta === aluno;
-          if (status) acertos++;
-          detalhes.push({ q, correta, aluno, status });
-        });
-      } else {
-        // Se a IA gerou tudo na hora
-        Object.keys(resultadoBruto).forEach(q => {
-          total++;
-          const { correta, aluno } = resultadoBruto[q];
-          const status = correta === aluno;
-          if (status) acertos++;
-          detalhes.push({ q, correta, aluno, status });
-        });
-      }
+      Object.keys(gabaritoFinal).forEach(q => {
+        total++;
+        // Se a IA retornar objeto (no caso de fast sem gabarito prévio) ou string
+        const correta = typeof gabaritoFinal[q] === 'object' ? gabaritoFinal[q].correta : gabaritoFinal[q];
+        const aluno = typeof resultadoBruto[q] === 'object' ? resultadoBruto[q].aluno : resultadoBruto[q];
+        
+        const status = correta === aluno;
+        if (status) acertos++;
+        detalhes.push({ q, correta, aluno, status });
+      });
 
       const nota = total > 0 ? ((acertos / total) * 10).toFixed(1) : 0;
       return Response.json({ modo, nota, acertos, total, detalhes });
     }
 
-    // Retorno padrão para modo Professor ou Tutor
     return Response.json({ modo, resultado: resultadoBruto });
 
   } catch (error) {
-    console.error("Erro no Route:", error);
-    return Response.json({ erro: "Falha na análise", detalhe: error.message }, { status: 500 });
+    return Response.json({ erro: error.message }, { status: 500 });
   }
 }
