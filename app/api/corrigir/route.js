@@ -5,25 +5,38 @@ export async function POST(req) {
 
     if (!img) return Response.json({ erro: "Imagem necessária" }, { status: 400 });
 
-    // --- LOGICA DE ROTEAMENTO DE MODELOS ---
-    // Forçamos o GPT-4o (potente) para o Tutor e para o Professor garantir o gabarito
+    // Roteamento inteligente: Usa o modelo mais potente para Professor e Tutor
     const modelo = (modo === "tutor" || modo === "professor") ? "openai/gpt-4o" : "openai/gpt-4o-mini";
 
     let promptSistema = "";
 
     if (modo === "professor") {
-      promptSistema = `Aja como um Professor de Português. Analise a imagem e identifique a alternativa correta.
-      Questão 1 é fonética: 'Cenoura' tem som de /s/, logo a resposta deve ter o mesmo som.
-      Responda APENAS JSON: {"1": "C", "2": "C", "3": "D", "4": "D"}`;
+      promptSistema = `Você é um Professor especialista elaborando um gabarito oficial.
+      REGRA DE OURO: IGNORE COMPLETAMENTE qualquer marcação, risco, X ou letra gigante feita a caneta ou lápis pelo aluno. Resolva a questão do zero lendo o texto, a imagem e as alternativas com sua própria inteligência.
+      
+      PASSOS:
+      1. Identifique o NÚMERO REAL da questão impresso na prova (ex: 12, 03, etc).
+      2. Escolha a alternativa correta baseada apenas na lógica e no material de apoio da prova.
+      
+      Responda APENAS um JSON no formato {"numero_da_questao": "Letra_Correta"}. 
+      Exemplo: {"12": "D"}`;
     } 
     else if (modo === "fast") {
-      promptSistema = `Aja como um scanner. O que o aluno MARCOU na imagem? (X ou círculo).
-      Responda APENAS JSON: {"1": "C", "2": "C", "3": "D", "4": "D"}`;
+      promptSistema = `Você é um corretor visual. Sua ÚNICA função é olhar a imagem e dizer o que o ALUNO marcou (seja com um X, um círculo, ou uma letra escrita por cima). Não tente resolver a questão.
+      
+      Responda APENAS um JSON no formato {"numero_da_questao": "Letra_Marcada_Pelo_Aluno"}. 
+      Exemplo: {"12": "C"}`;
     } 
     else if (modo === "tutor") {
-      promptSistema = `Aja como Tutor. Explique por que a alternativa correta é a que o professor escolheu.
-      Exemplo Questão 1: 'Cenoura' e 'Macio' possuem o 'C' com som de /s/. 
-      Responda APENAS JSON: {"1": {"res": "C", "exp": "Explicação..."}, "2": {"res": "C", "exp": "..."}}`;
+      promptSistema = `Aja como um Professor Tutor didático e encorajador. Sua missão é explicar o PORQUÊ da resposta estar correta.
+      
+      REGRAS:
+      1. Identifique o número real da questão (ex: 12).
+      2. Diga qual é a alternativa correta VERDADEIRA e explique o motivo citando o texto, a imagem ou regras gramaticais/fonéticas.
+      3. Nunca se baseie nas respostas escritas à mão pelo aluno para dar a explicação.
+      
+      Responda APENAS um JSON. Exemplo: 
+      {"12": {"res": "D", "exp": "A expressão CHOMP CHOMP é uma onomatopeia que representa o som de mastigação."}}`;
     }
 
     const resIA = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -41,23 +54,24 @@ export async function POST(req) {
     });
 
     const data = await resIA.json();
-    if (!data.choices) throw new Error("IA não respondeu a tempo");
+    if (!data.choices) throw new Error("IA não respondeu a tempo. Tente novamente.");
     
     const resultadoBruto = JSON.parse(data.choices[0].message.content);
 
-    // --- CORREÇÃO DO TRAVAMENTO DO MODO FAST ---
+    // Lógica para calcular a nota e cruzar dados no Modo Fast
     if (modo === "fast") {
+      // Se não houver gabarito prévio, usa o que a IA acabou de ler (fallback)
       const gabaritoBase = gabaritoOficial || resultadoBruto;
       let acertos = 0;
       let total = 0;
       let detalhes = [];
 
-      // Garantimos que percorremos as chaves corretamente
       Object.keys(gabaritoBase).forEach(q => {
         total++;
         const correta = typeof gabaritoBase[q] === 'object' ? gabaritoBase[q].correta : gabaritoBase[q];
-        const aluno = resultadoBruto[q] || "N/A"; // Se a IA não viu a marcação, não trava
+        const aluno = resultadoBruto[q] || "N/A";
         
+        // Compara ignorando maiúsculas/minúsculas
         const status = (String(correta).toUpperCase() === String(aluno).toUpperCase());
         if (status) acertos++;
         
@@ -71,7 +85,7 @@ export async function POST(req) {
     return Response.json({ modo, resultado: resultadoBruto });
 
   } catch (error) {
-    console.error("Erro Crítico:", error);
-    return Response.json({ erro: "Ocorreu um erro no processamento", detalhe: error.message }, { status: 500 });
+    console.error("Erro na API:", error);
+    return Response.json({ erro: "Ocorreu um erro no processamento da imagem." }, { status: 500 });
   }
 }
