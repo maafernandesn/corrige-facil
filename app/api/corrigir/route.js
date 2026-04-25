@@ -9,21 +9,28 @@ export async function POST(req) {
       return Response.json({ erro: "Imagem não enviada" });
     }
 
+    // 🔒 PROMPT TRAVADO
     const prompt = `
-Analise as perguntas da imagem.
+Você é um corretor de provas.
+
+SIGA O FORMATO EXATAMENTE.
+SE NÃO SEGUIR, SUA RESPOSTA SERÁ DESCARTADA.
 
 REGRAS:
-- Existe apenas UMA alternativa correta por questão
-- Nunca escolha duas
-- Sempre explique
+- Apenas UMA alternativa correta por questão
+- NÃO escreva títulos extras
+- NÃO escreva explicações longas
+- NÃO use markdown
+- NÃO use negrito
+- NÃO escreva "Pergunta" ou "Análise"
 
 FORMATO OBRIGATÓRIO:
 
 Questão 1
-A) errado - motivo
-B) errado - motivo
-C) correto - motivo
-D) errado - motivo
+A) errado - motivo curto
+B) errado - motivo curto
+C) correto - motivo curto
+D) errado - motivo curto
 Resposta: C
 
 Repita para todas as questões
@@ -32,9 +39,9 @@ No final escreva EXATAMENTE:
 
 RESUMO FINAL:
 1:C
-2:D
-3:A
-4:B
+2:C
+3:D
+4:D
 `;
 
     async function chamarIA() {
@@ -62,10 +69,14 @@ RESUMO FINAL:
       return data?.choices?.[0]?.message?.content;
     }
 
-    // 🔁 TENTA ATÉ 2 VEZES (ANTI ERRO DA IA)
+    // 🔁 TENTA ATÉ 2 VEZES (anti-resposta fora do padrão)
     let resposta = await chamarIA();
 
-    if (!resposta || !resposta.includes("RESUMO FINAL")) {
+    if (
+      !resposta ||
+      !resposta.includes("RESUMO FINAL") ||
+      !resposta.includes("Resposta:")
+    ) {
       resposta = await chamarIA();
     }
 
@@ -78,14 +89,15 @@ RESUMO FINAL:
       return Response.json({ resultado: resposta });
     }
 
-    // 🔥 LIMPEZA
+    // 🧹 LIMPEZA
     resposta = resposta
       .replace(/\u00A0/g, " ")
       .replace(/\r/g, "")
       .replace(/\t/g, "")
+      .replace(/ +/g, " ")
       .trim();
 
-    // 🔥 PEGA RESUMO FINAL
+    // 🔥 EXTRAI RESUMO FINAL
     const resumoMatch = resposta.match(/RESUMO FINAL:\s*([\s\S]*)/i);
 
     if (!resumoMatch) {
