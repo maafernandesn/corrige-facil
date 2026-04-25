@@ -5,41 +5,34 @@ export async function POST(req) {
 
     if (!img) return Response.json({ erro: "Imagem necessária" }, { status: 400 });
 
-    // Roteamento inteligente: Usa o modelo mais potente para Professor e Tutor
-    const modelo = (modo === "tutor" || modo === "professor") ? "openai/gpt-4o" : "openai/gpt-4o-mini";
+    // Forçamos o modelo mais inteligente para evitar erros fonéticos básicos
+    const modelo = "openai/gpt-4o"; 
 
     let promptSistema = "";
 
     if (modo === "professor") {
-      promptSistema = `Você é um Professor especialista elaborando um gabarito oficial.
-      REGRA DE OURO: IGNORE COMPLETAMENTE qualquer marcação, risco, X ou letra gigante feita a caneta ou lápis pelo aluno. Resolva as questões do zero lendo o texto, a imagem e as alternativas com sua própria inteligência.
+      promptSistema = `Aja como um Professor Rigoroso. 
+      1. IGNORE marcações de alunos (X, círculos, riscos). 
+      2. LEIA o texto 'Vida Saudável' e as alternativas com atenção extrema.
+      3. Analise a fonética (ex: 'C' com som de /s/ em 'Cenoura' deve ser igual a 'Macio', não 'Recheio').
+      4. Gere um gabarito incontestável.
       
-      PASSOS:
-      1. Varra a imagem inteira e identifique TODAS as questões presentes (ex: 01, 02, 03, 04...).
-      2. Escolha a alternativa correta para CADA UMA baseada apenas na lógica e no material de apoio da prova.
-      
-      Responda APENAS um JSON contendo TODAS as questões encontradas. 
-      Exemplo: {"01": "C", "02": "C", "03": "D", "04": "D"}`;
+      Responda APENAS um JSON: {"01": "C", "02": "C", "03": "D", "04": "D"}`;
     } 
     else if (modo === "fast") {
-      promptSistema = `Você é um corretor visual. Sua ÚNICA função é olhar a imagem inteira e dizer o que o ALUNO marcou em TODAS as questões (seja com um X, um círculo, ou uma letra escrita por cima). Não tente resolver a questão.
+      // Aqui está o segredo: passamos o gabarito oficial para a IA não precisar "pensar", apenas "olhar" o aluno
+      promptSistema = `Você é um conferencista de marcas. Sua ÚNICA tarefa é olhar para a imagem e identificar qual alternativa o ALUNO marcou (onde tem um X ou círculo). 
       
-      Varra a imagem inteira e responda APENAS um JSON com TODAS as questões encontradas. 
-      Exemplo: {"01": "C", "02": "A", "03": "D", "04": "B"}`;
+      Gabarito de referência (NÃO USE PARA CORRIGIR, APENAS PARA SABER QUAIS QUESTÕES EXISTEM): ${JSON.stringify(gabaritoOficial)}
+      
+      Responda APENAS um JSON com o que o ALUNO marcou: {"01": "C", "02": "A", ...}`;
     } 
     else if (modo === "tutor") {
-      promptSistema = `Aja como um Professor Tutor didático e encorajador. Sua missão é explicar o PORQUÊ da resposta estar correta para TODAS as questões da imagem.
+      promptSistema = `Aja como um Tutor Didático. 
+      Explique cada questão do gabarito fornecido: ${JSON.stringify(gabaritoOficial)}.
+      Se o gabarito diz que 01 é C, explique por que C é a correta baseada no texto ou gramática. 
       
-      REGRAS:
-      1. Varra a imagem e identifique TODAS as questões.
-      2. Diga qual é a alternativa correta VERDADEIRA e explique o motivo citando o texto, a imagem ou regras gramaticais/fonéticas.
-      3. Nunca se baseie nas respostas escritas à mão pelo aluno para dar a explicação.
-      
-      Responda APENAS um JSON contendo TODAS as questões. Exemplo: 
-      {
-        "01": {"res": "C", "exp": "Explicação da questão 1..."},
-        "02": {"res": "A", "exp": "Explicação da questão 2..."}
-      }`;
+      Responda APENAS um JSON: {"01": {"res": "C", "exp": "Explicação..."}, ...}`;
     }
 
     const resIA = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -52,41 +45,37 @@ export async function POST(req) {
         model: modelo,
         messages: [{ role: "user", content: [{ type: "text", text: promptSistema }, { type: "image_url", image_url: { url: img } }] }],
         response_format: { type: "json_object" },
-        temperature: 0
+        temperature: 0 // Temperatura 0 para evitar variações nas respostas
       })
     });
 
     const data = await resIA.json();
-    if (!data.choices) throw new Error("IA não respondeu a tempo. Tente novamente.");
-    
     const resultadoBruto = JSON.parse(data.choices[0].message.content);
 
-    // Lógica para calcular a nota e cruzar dados no Modo Fast
     if (modo === "fast") {
-      const gabaritoBase = gabaritoOficial || resultadoBruto;
       let acertos = 0;
       let total = 0;
       let detalhes = [];
 
-      Object.keys(gabaritoBase).forEach(q => {
+      // Cruzamento de dados entre Gabarito do Professor vs Marcação do Aluno
+      Object.keys(gabaritoOficial).forEach(q => {
         total++;
-        const correta = typeof gabaritoBase[q] === 'object' ? gabaritoBase[q].correta : gabaritoBase[q];
+        const correta = gabaritoOficial[q];
         const aluno = resultadoBruto[q] || "N/A";
         
-        const status = (String(correta).toUpperCase() === String(aluno).toUpperCase());
+        const status = (String(correta).trim().toUpperCase() === String(aluno).trim().toUpperCase());
         if (status) acertos++;
         
         detalhes.push({ q, correta, aluno, status });
       });
 
-      const nota = total > 0 ? ((acertos / total) * 10).toFixed(1) : "0.0";
+      const nota = ((acertos / total) * 10).toFixed(1);
       return Response.json({ modo, nota, acertos, total, detalhes });
     }
 
     return Response.json({ modo, resultado: resultadoBruto });
 
   } catch (error) {
-    console.error("Erro na API:", error);
-    return Response.json({ erro: "Ocorreu um erro no processamento da imagem." }, { status: 500 });
+    return Response.json({ erro: "Erro ao processar prova." }, { status: 500 });
   }
 }
