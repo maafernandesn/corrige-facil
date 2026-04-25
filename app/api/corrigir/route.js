@@ -5,34 +5,32 @@ export async function POST(req) {
 
     if (!img) return Response.json({ erro: "Imagem necessária" }, { status: 400 });
 
-    // Forçamos o modelo mais inteligente para evitar erros fonéticos básicos
+    // Usamos o GPT-4o (mais potente) para garantir precisão em fonética e interpretação
     const modelo = "openai/gpt-4o"; 
 
     let promptSistema = "";
 
     if (modo === "professor") {
-      promptSistema = `Aja como um Professor Rigoroso. 
-      1. IGNORE marcações de alunos (X, círculos, riscos). 
-      2. LEIA o texto 'Vida Saudável' e as alternativas com atenção extrema.
-      3. Analise a fonética (ex: 'C' com som de /s/ em 'Cenoura' deve ser igual a 'Macio', não 'Recheio').
-      4. Gere um gabarito incontestável.
-      
-      Responda APENAS um JSON: {"01": "C", "02": "C", "03": "D", "04": "D"}`;
+      promptSistema = `Você é um Professor Especialista. Sua tarefa é criar o GABARITO OFICIAL da prova.
+      1. IGNORE COMPLETAMENTE marcações manuais (X, círculos, letras grandes escritas pelo aluno).
+      2. Resolva as questões do zero com base no texto, imagens e lógica.
+      3. Verifique fonética com rigor (ex: 'C' com som de /s/ em 'Cenoura' é igual a 'Macio').
+      4. Varra a imagem inteira para encontrar TODAS as questões.
+      Responda APENAS JSON: {"01": "C", "02": "C", "03": "D", "04": "D"}`;
     } 
+    
     else if (modo === "fast") {
-      // Aqui está o segredo: passamos o gabarito oficial para a IA não precisar "pensar", apenas "olhar" o aluno
-      promptSistema = `Você é um conferencista de marcas. Sua ÚNICA tarefa é olhar para a imagem e identificar qual alternativa o ALUNO marcou (onde tem um X ou círculo). 
-      
-      Gabarito de referência (NÃO USE PARA CORRIGIR, APENAS PARA SABER QUAIS QUESTÕES EXISTEM): ${JSON.stringify(gabaritoOficial)}
-      
-      Responda APENAS um JSON com o que o ALUNO marcou: {"01": "C", "02": "A", ...}`;
+      promptSistema = `Você é um Inspetor Visual. Sua ÚNICA tarefa é identificar o que o ALUNO MARCOU na imagem.
+      Gabarito de referência (apenas para saber quais questões existem): ${JSON.stringify(gabaritoOficial)}.
+      Não tente resolver as questões, apenas relate onde está o X ou o círculo do aluno.
+      Responda APENAS JSON: {"01": "A", "02": "C", ...}`;
     } 
+    
     else if (modo === "tutor") {
-      promptSistema = `Aja como um Tutor Didático. 
-      Explique cada questão do gabarito fornecido: ${JSON.stringify(gabaritoOficial)}.
-      Se o gabarito diz que 01 é C, explique por que C é a correta baseada no texto ou gramática. 
-      
-      Responda APENAS um JSON: {"01": {"res": "C", "exp": "Explicação..."}, ...}`;
+      promptSistema = `Aja como um Tutor Pedagógico didático. 
+      Você DEVE explicar as respostas com base NESTE GABARITO: ${JSON.stringify(gabaritoOficial)}.
+      Não discorde do gabarito. Explique o porquê de cada resposta ser a correta citando regras de português ou trechos do texto.
+      Responda APENAS JSON: {"01": {"res": "C", "exp": "Explicação..."}, ...}`;
     }
 
     const resIA = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -45,37 +43,39 @@ export async function POST(req) {
         model: modelo,
         messages: [{ role: "user", content: [{ type: "text", text: promptSistema }, { type: "image_url", image_url: { url: img } }] }],
         response_format: { type: "json_object" },
-        temperature: 0 // Temperatura 0 para evitar variações nas respostas
+        temperature: 0
       })
     });
 
     const data = await resIA.json();
+    if (!data.choices) throw new Error("A IA demorou para responder. Tente novamente.");
+    
     const resultadoBruto = JSON.parse(data.choices[0].message.content);
 
+    // Lógica de cruzamento para o Modo Fast
     if (modo === "fast") {
+      if (!gabaritoOficial) return Response.json({ erro: "Gere o gabarito no modo Professor primeiro!" }, { status: 400 });
+      
       let acertos = 0;
-      let total = 0;
       let detalhes = [];
+      const questoes = Object.keys(gabaritoOficial);
 
-      // Cruzamento de dados entre Gabarito do Professor vs Marcação do Aluno
-      Object.keys(gabaritoOficial).forEach(q => {
-        total++;
+      questoes.forEach(q => {
         const correta = gabaritoOficial[q];
         const aluno = resultadoBruto[q] || "N/A";
-        
-        const status = (String(correta).trim().toUpperCase() === String(aluno).trim().toUpperCase());
+        const status = String(correta).toUpperCase() === String(aluno).toUpperCase();
         if (status) acertos++;
-        
         detalhes.push({ q, correta, aluno, status });
       });
 
-      const nota = ((acertos / total) * 10).toFixed(1);
-      return Response.json({ modo, nota, acertos, total, detalhes });
+      const nota = ((acertos / questoes.length) * 10).toFixed(1);
+      return Response.json({ modo, nota, acertos, total: questoes.length, detalhes });
     }
 
     return Response.json({ modo, resultado: resultadoBruto });
 
   } catch (error) {
-    return Response.json({ erro: "Erro ao processar prova." }, { status: 500 });
+    console.error("Erro API:", error);
+    return Response.json({ erro: "Erro ao processar imagem: " + error.message }, { status: 500 });
   }
 }
