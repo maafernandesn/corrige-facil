@@ -9,20 +9,22 @@ export async function POST(req) {
       return Response.json({ erro: "Imagem não enviada" });
     }
 
-    // 🔒 PROMPT TRAVADO
+    // 🔒 PROMPT MELHORADO (MAIS PRECISO)
     const prompt = `
 Você é um corretor de provas.
 
 SIGA O FORMATO EXATAMENTE.
 SE NÃO SEGUIR, SUA RESPOSTA SERÁ DESCARTADA.
 
-REGRAS:
+REGRAS IMPORTANTES:
 - Apenas UMA alternativa correta por questão
-- NÃO escreva títulos extras
-- NÃO escreva explicações longas
+- NÃO deduza respostas
+- Use apenas o texto da imagem
+- Escolha a alternativa mais literal e direta
+- Evite interpretações genéricas
 - NÃO use markdown
 - NÃO use negrito
-- NÃO escreva "Pergunta" ou "Análise"
+- NÃO escreva títulos extras
 
 FORMATO OBRIGATÓRIO:
 
@@ -35,7 +37,7 @@ Resposta: C
 
 Repita para todas as questões
 
-No final escreva EXATAMENTE:
+No final escreva:
 
 RESUMO FINAL:
 1:C
@@ -69,7 +71,7 @@ RESUMO FINAL:
       return data?.choices?.[0]?.message?.content;
     }
 
-    // 🔁 Retry automático
+    // 🔁 RETRY AUTOMÁTICO
     let resposta = await chamarIA();
 
     if (
@@ -89,7 +91,7 @@ RESUMO FINAL:
       return Response.json({ resultado: resposta });
     }
 
-    // 🧹 LIMPEZA DE TEXTO
+    // 🧹 LIMPEZA
     resposta = resposta
       .replace(/\u00A0/g, " ")
       .replace(/\r/g, "")
@@ -97,23 +99,12 @@ RESUMO FINAL:
       .replace(/ +/g, " ")
       .trim();
 
-    // 🔥 EXTRAI BLOCO DO RESUMO
-    const resumoMatch = resposta.match(/RESUMO FINAL:\s*([\s\S]*)/i);
-
-    if (!resumoMatch) {
-      return Response.json({
-        resultado: "⚠️ Não consegui identificar o resumo."
-      });
-    }
-
-    const bloco = resumoMatch[1];
-
-    // 🔥 EXTRAÇÃO ROBUSTA (FUNCIONA MESMO SEM QUEBRA DE LINHA)
-    const matches = bloco.match(/(\d+)\s*:\s*([A-D])/gi);
+    // 🔥 EXTRAÇÃO GLOBAL (FINAL E DEFINITIVA)
+    const matches = resposta.match(/(\d+)\s*:\s*([A-D])/gi);
 
     if (!matches) {
       return Response.json({
-        resultado: "⚠️ Resumo inválido."
+        resultado: "⚠️ Não consegui extrair as respostas."
       });
     }
 
