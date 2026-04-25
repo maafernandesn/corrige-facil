@@ -9,41 +9,25 @@ export async function POST(req) {
       return Response.json({ erro: "Imagem não enviada" });
     }
 
-    // 🔒 PROMPT MELHORADO (MAIS PRECISO)
     const prompt = `
-Você é um corretor de provas.
+Analise as questões da imagem com atenção.
 
-SIGA O FORMATO EXATAMENTE.
-SE NÃO SEGUIR, SUA RESPOSTA SERÁ DESCARTADA.
+REGRAS:
+- Existe apenas UMA alternativa correta por questão
+- NÃO chute respostas
+- Baseie-se no texto da imagem
+- Escolha a alternativa mais direta
 
-REGRAS IMPORTANTES:
-- Apenas UMA alternativa correta por questão
-- NÃO deduza respostas
-- Use apenas o texto da imagem
-- Escolha a alternativa mais literal e direta
-- Evite interpretações genéricas
-- NÃO use markdown
-- NÃO use negrito
-- NÃO escreva títulos extras
-
-FORMATO OBRIGATÓRIO:
+FORMATO:
 
 Questão 1
-A) errado - motivo curto
-B) errado - motivo curto
-C) correto - motivo curto
-D) errado - motivo curto
-Resposta: C
+A) ...
+B) ...
+C) ...
+D) ...
+Resposta: X
 
-Repita para todas as questões
-
-No final escreva:
-
-RESUMO FINAL:
-1:C
-2:C
-3:D
-4:D
+Repita para todas as questões.
 `;
 
     async function chamarIA() {
@@ -71,50 +55,36 @@ RESUMO FINAL:
       return data?.choices?.[0]?.message?.content;
     }
 
-    // 🔁 RETRY AUTOMÁTICO
     let resposta = await chamarIA();
-
-    if (
-      !resposta ||
-      !resposta.includes("RESUMO FINAL") ||
-      !resposta.includes("Resposta:")
-    ) {
-      resposta = await chamarIA();
-    }
 
     if (!resposta) {
       return Response.json({ erro: "IA não respondeu" });
     }
 
-    // 🧠 MODO PROFESSOR
+    // 🧠 PROFESSOR
     if (modo === "professor") {
       return Response.json({ resultado: resposta });
     }
 
-    // 🧹 LIMPEZA
+    // 🔥 LIMPEZA
     resposta = resposta
       .replace(/\u00A0/g, " ")
       .replace(/\r/g, "")
       .replace(/\t/g, "")
-      .replace(/ +/g, " ")
       .trim();
 
-    // 🔥 EXTRAÇÃO GLOBAL (FINAL E DEFINITIVA)
-    const matches = resposta.match(/(\d+)\s*:\s*([A-D])/gi);
+    // 🔥 EXTRAÇÃO BASEADA EM "Resposta: X"
+    const matches = [...resposta.matchAll(/Resposta:\s*([A-D])/gi)];
 
-    if (!matches) {
+    if (matches.length === 0) {
       return Response.json({
-        resultado: "⚠️ Não consegui extrair as respostas."
+        resultado: "⚠️ Não consegui identificar as respostas."
       });
     }
 
     const corretas = {};
-
-    matches.forEach(item => {
-      const match = item.match(/(\d+)\s*:\s*([A-D])/i);
-      if (match) {
-        corretas[match[1]] = match[2].toUpperCase();
-      }
+    matches.forEach((m, i) => {
+      corretas[i + 1] = m[1].toUpperCase();
     });
 
     // 🔥 RESPOSTAS DO ALUNO
@@ -126,7 +96,7 @@ RESUMO FINAL:
 
     let resultado = "";
     let acertos = 0;
-    let total = Object.keys(corretas).length;
+    let total = matches.length;
 
     Object.keys(corretas).forEach(q => {
       const correta = corretas[q];
