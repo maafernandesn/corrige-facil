@@ -69,7 +69,7 @@ RESUMO FINAL:
       return data?.choices?.[0]?.message?.content;
     }
 
-    // 🔁 TENTA ATÉ 2 VEZES (anti-resposta fora do padrão)
+    // 🔁 Retry automático
     let resposta = await chamarIA();
 
     if (
@@ -89,7 +89,7 @@ RESUMO FINAL:
       return Response.json({ resultado: resposta });
     }
 
-    // 🧹 LIMPEZA
+    // 🧹 LIMPEZA DE TEXTO
     resposta = resposta
       .replace(/\u00A0/g, " ")
       .replace(/\r/g, "")
@@ -97,7 +97,7 @@ RESUMO FINAL:
       .replace(/ +/g, " ")
       .trim();
 
-    // 🔥 EXTRAI RESUMO FINAL
+    // 🔥 EXTRAI BLOCO DO RESUMO
     const resumoMatch = resposta.match(/RESUMO FINAL:\s*([\s\S]*)/i);
 
     if (!resumoMatch) {
@@ -106,22 +106,25 @@ RESUMO FINAL:
       });
     }
 
-    const linhas = resumoMatch[1].split("\n");
+    const bloco = resumoMatch[1];
 
-    const corretas = {};
+    // 🔥 EXTRAÇÃO ROBUSTA (FUNCIONA MESMO SEM QUEBRA DE LINHA)
+    const matches = bloco.match(/(\d+)\s*:\s*([A-D])/gi);
 
-    linhas.forEach(linha => {
-      const match = linha.match(/(\d+)\s*:\s*([A-D])/i);
-      if (match) {
-        corretas[match[1]] = match[2].toUpperCase();
-      }
-    });
-
-    if (Object.keys(corretas).length === 0) {
+    if (!matches) {
       return Response.json({
         resultado: "⚠️ Resumo inválido."
       });
     }
+
+    const corretas = {};
+
+    matches.forEach(item => {
+      const match = item.match(/(\d+)\s*:\s*([A-D])/i);
+      if (match) {
+        corretas[match[1]] = match[2].toUpperCase();
+      }
+    });
 
     // 🔥 RESPOSTAS DO ALUNO
     const aluno = {};
