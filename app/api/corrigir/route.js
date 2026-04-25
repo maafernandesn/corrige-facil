@@ -5,32 +5,36 @@ export async function POST(req) {
 
     if (!img) return Response.json({ erro: "Imagem necessária" }, { status: 400 });
 
-    // Usamos o GPT-4o (mais potente) para garantir precisão em fonética e interpretação
-    const modelo = "openai/gpt-4o"; 
+    const modelo = "openai/gpt-4o"; // Mantemos o potente para evitar erros de visão
 
     let promptSistema = "";
 
     if (modo === "professor") {
-      promptSistema = `Você é um Professor Especialista. Sua tarefa é criar o GABARITO OFICIAL da prova.
-      1. IGNORE COMPLETAMENTE marcações manuais (X, círculos, letras grandes escritas pelo aluno).
-      2. Resolva as questões do zero com base no texto, imagens e lógica.
-      3. Verifique fonética com rigor (ex: 'C' com som de /s/ em 'Cenoura' é igual a 'Macio').
-      4. Varra a imagem inteira para encontrar TODAS as questões.
-      Responda APENAS JSON: {"01": "C", "02": "C", "03": "D", "04": "D"}`;
+      promptSistema = `Você é um Professor Especialista. Sua tarefa é criar o GABARITO OFICIAL.
+      1. IGNORE qualquer marcação de aluno. Resolva a prova do zero.
+      2. Identifique TODAS as questões da imagem, não importa o formato (múltipla escolha, verdadeiro/falso, etc).
+      3. Se a questão não tiver letras (A,B,C), use números ou identifique o padrão.
+      Responda APENAS JSON: {"01": "A", "02": "B", ...}`;
     } 
     
     else if (modo === "fast") {
-      promptSistema = `Você é um Inspetor Visual. Sua ÚNICA tarefa é identificar o que o ALUNO MARCOU na imagem.
-      Gabarito de referência (apenas para saber quais questões existem): ${JSON.stringify(gabaritoOficial)}.
-      Não tente resolver as questões, apenas relate onde está o X ou o círculo do aluno.
-      Responda APENAS JSON: {"01": "A", "02": "C", ...}`;
+      promptSistema = `Você é um Inspetor Visual de Alta Precisão. 
+      Sua tarefa é identificar o que o ALUNO MARCOU.
+      
+      CRITÉRIO DE ANALISE:
+      1. Procure por um X, círculo ou rasura clara em cima de uma alternativa.
+      2. IMPORTANTE: Se a questão não tiver NENHUMA marcação clara do aluno, responda "EM BRANCO".
+      3. Ignore desenhos ou letras grandes fora das alternativas.
+      
+      Gabarito de referência: ${JSON.stringify(gabaritoOficial)}.
+      Responda APENAS JSON: {"01": "C", "02": "EM BRANCO", ...}`;
     } 
     
     else if (modo === "tutor") {
-      promptSistema = `Aja como um Tutor Pedagógico didático. 
-      Você DEVE explicar as respostas com base NESTE GABARITO: ${JSON.stringify(gabaritoOficial)}.
-      Não discorde do gabarito. Explique o porquê de cada resposta ser a correta citando regras de português ou trechos do texto.
-      Responda APENAS JSON: {"01": {"res": "C", "exp": "Explicação..."}, ...}`;
+      promptSistema = `Aja como um Tutor Pedagógico. 
+      Explique as respostas com base neste GABARITO: ${JSON.stringify(gabaritoOficial)}.
+      Foque na explicação lógica e gramatical.
+      Responda APENAS JSON: {"01": {"res": "A", "exp": "..."}, ...}`;
     }
 
     const resIA = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -48,11 +52,8 @@ export async function POST(req) {
     });
 
     const data = await resIA.json();
-    if (!data.choices) throw new Error("A IA demorou para responder. Tente novamente.");
-    
     const resultadoBruto = JSON.parse(data.choices[0].message.content);
 
-    // Lógica de cruzamento para o Modo Fast
     if (modo === "fast") {
       if (!gabaritoOficial) return Response.json({ erro: "Gere o gabarito no modo Professor primeiro!" }, { status: 400 });
       
@@ -62,9 +63,12 @@ export async function POST(req) {
 
       questoes.forEach(q => {
         const correta = gabaritoOficial[q];
-        const aluno = resultadoBruto[q] || "N/A";
-        const status = String(correta).toUpperCase() === String(aluno).toUpperCase();
+        const aluno = resultadoBruto[q] || "EM BRANCO";
+        
+        // Só é acerto se não estiver em branco e for igual à correta
+        const status = aluno !== "EM BRANCO" && String(correta).toUpperCase() === String(aluno).toUpperCase();
         if (status) acertos++;
+        
         detalhes.push({ q, correta, aluno, status });
       });
 
@@ -75,7 +79,6 @@ export async function POST(req) {
     return Response.json({ modo, resultado: resultadoBruto });
 
   } catch (error) {
-    console.error("Erro API:", error);
-    return Response.json({ erro: "Erro ao processar imagem: " + error.message }, { status: 500 });
+    return Response.json({ erro: "Erro ao processar imagem." }, { status: 500 });
   }
 }
