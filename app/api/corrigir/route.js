@@ -3,20 +3,25 @@ export async function POST(req) {
     const body = await req.json();
     const img = body.img;
     const modo = body.modo || "professor";
-    const respostasAlunoStr = body.respostasAluno || "";
+
+    // 🔥 fallback para teste (remove depois se quiser)
+    const respostasAlunoStr =
+      body.respostasAluno || "1-C,2-C,3-D,4-D";
 
     if (!img) {
       return Response.json({ erro: "Imagem não enviada" });
     }
 
+    // 🧠 PROMPT MAIS INTELIGENTE
     const prompt = `
-Analise as questões da imagem com atenção.
+Você é um professor corrigindo uma prova.
 
-REGRAS:
-- Existe apenas UMA alternativa correta por questão
+REGRAS IMPORTANTES:
+- Leia o texto com atenção
+- NÃO use conhecimento externo
 - NÃO chute respostas
-- Baseie-se no texto da imagem
-- Escolha a alternativa mais direta
+- Use apenas o que está escrito
+- Existe apenas UMA alternativa correta
 
 FORMATO:
 
@@ -38,7 +43,8 @@ Repita para todas as questões.
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          model: "openai/gpt-4o-mini",
+          // 🔥 pode trocar para melhorar precisão
+          model: "openai/gpt-4o", 
           messages: [
             {
               role: "user",
@@ -52,42 +58,55 @@ Repita para todas as questões.
       });
 
       const data = await res.json();
+
+      if (data.error) {
+        throw new Error(data.error.message || "Erro da API");
+      }
+
       return data?.choices?.[0]?.message?.content;
     }
 
+    // 🔁 RETRY AUTOMÁTICO
     let resposta = await chamarIA();
+
+    if (!resposta || !resposta.includes("Resposta:")) {
+      resposta = await chamarIA();
+    }
 
     if (!resposta) {
       return Response.json({ erro: "IA não respondeu" });
     }
 
-    // 🧠 PROFESSOR
+    // 🧠 MODO PROFESSOR
     if (modo === "professor") {
       return Response.json({ resultado: resposta });
     }
 
-    // 🔥 LIMPEZA
+    // 🧹 LIMPEZA FORTE
     resposta = resposta
       .replace(/\u00A0/g, " ")
       .replace(/\r/g, "")
       .replace(/\t/g, "")
+      .replace(/\*\*/g, "")
+      .replace(/ +/g, " ")
       .trim();
 
-    // 🔥 EXTRAÇÃO BASEADA EM "Resposta: X"
+    // 🔥 EXTRAÇÃO ROBUSTA DAS RESPOSTAS
     const matches = [...resposta.matchAll(/Resposta:\s*([A-D])/gi)];
 
     if (matches.length === 0) {
       return Response.json({
-        resultado: "⚠️ Não consegui identificar as respostas."
+        erro: "Não consegui extrair respostas da IA",
+        debug: resposta
       });
     }
 
     const corretas = {};
     matches.forEach((m, i) => {
-      corretas[i + 1] = m[1].toUpperCase();
+      corretas[(i + 1).toString()] = m[1].toUpperCase();
     });
 
-    // 🔥 RESPOSTAS DO ALUNO
+    // 🔥 PROCESSA RESPOSTAS DO ALUNO
     const aluno = {};
     respostasAlunoStr.split(",").forEach(par => {
       const [q, r] = par.trim().split("-");
@@ -96,7 +115,7 @@ Repita para todas as questões.
 
     let resultado = "";
     let acertos = 0;
-    let total = matches.length;
+    let total = Object.keys(corretas).length;
 
     Object.keys(corretas).forEach(q => {
       const correta = corretas[q];
@@ -115,7 +134,9 @@ Repita para todas as questões.
       }
     });
 
-    const nota = ((acertos / total) * 10).toFixed(1);
+    const nota = total > 0
+      ? ((acertos / total) * 10).toFixed(1)
+      : 0;
 
     resultado += `\n🎯 Nota: ${nota} (${acertos}/${total})`;
 
